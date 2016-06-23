@@ -1,10 +1,10 @@
-import subprocess
 import os
+import subprocess
 import urllib
 
 import psycopg2
 
-from LCMAP_Ordering.utils import DBConnect
+from CCDC_Processing.utils import DBConnect
 
 
 def query_shape(shapepath, listpath, metatbl):
