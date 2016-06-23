@@ -2,7 +2,9 @@ import subprocess
 import os
 import urllib
 
-from LCMAP_Ordering.utils import dbConnect
+import psycopg2
+
+from LCMAP_Ordering.utils import DBConnect
 
 
 def query_shape(shapepath, listpath, metatbl):
@@ -27,7 +29,7 @@ def query_shape(shapepath, listpath, metatbl):
 
     pgrmtable = 'drop table shp_temp cascade'
 
-    with dbConnect(autocommit=True) as db:
+    with DBConnect(autocommit=True) as db:
         db.execute(pgstr % (metatbl, metatbl, listpath))
         db.execute(pgrmtable)
 
@@ -46,7 +48,7 @@ def landsat_meta(tableid):
                 'LS4-5/TM 2000-2009': 'http://landsat.usgs.gov/metadata_service/bulk_metadata_files/LANDSAT_TM-2000-2009.csv',
                 'LS4-5/TM 2010-2012': 'http://landsat.usgs.gov/metadata_service/bulk_metadata_files/LANDSAT_TM-2010-2012.csv'}
 
-    with dbConnect(autocommit=True) as db:
+    with DBConnect(autocommit=True) as db:
         try:
             db.execute(metatable(tableid))
         except psycopg2.Error:
@@ -196,7 +198,7 @@ def update_table(csv_path, table_id='landsat_meta'):
     :param table_id: Table to be updated
     :return:
     """
-    with dbConnect(autocommit=True) as db:
+    with DBConnect(autocommit=True) as db:
         sql_string = "select column_name from information_schema.columns where table_name =\
          '%s' and table_schema = 'public';" % table_id
         db.select(sql_string)
