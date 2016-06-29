@@ -1,9 +1,35 @@
-class ESPAOrder(object):
-    def add_component(self, comp):
-        self.__setattr__(type(comp).__name__, comp)
+from CCDC_Processing.ordering.ESPA_API import APIConnect
 
-    def __repr__(self):
-        return self.__dict__
+
+class ESPAOrder(APIConnect):
+    def __init__(self, username, password, host):
+        super(ESPAOrder, self).__init__(username, password, host)
+
+        self.espa_order = {'resampling_method': 'cc',
+                           'format': 'gtiff'}
+
+    def add_sensor(self, sensor):
+        if not isinstance(sensor, dict):
+            raise TypeError
+
+        self.espa_order.update(sensor)
+
+    def add_extent(self, xmin, xmax, ymin, ymax):
+        upd = {'image_extents': {'north': ymax,
+                                 'south': ymin,
+                                 'east': xmax,
+                                 'west': xmin}}
+
+        self.espa_order.update(upd)
+
+    def add_projection(self, proj):
+        if not isinstance(proj, dict):
+            raise TypeError
+
+        self.espa_order.update({'projection': proj})
+
+    def place_order(self):
+        return self.post_order(self.espa_order)
 
 
 class AlbersProjections(object):

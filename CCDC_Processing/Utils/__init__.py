@@ -9,8 +9,8 @@ class DBConnect(object):
     Class for connecting to a localhost postgresql database
     """
 
-    def __init__(self, database='postgis', user='postgres', password='postgres', autocommit=False):
-        self.conn = psycopg2.connect(database=database, user=user, password=password)
+    def __init__(self, host, port, database, user, password, autocommit=False):
+        self.conn = psycopg2.connect(host=host, port=port, database=database, user=user, password=password)
         try:
             self.cursor = self.conn.cursor()
         except psycopg2.Error:
@@ -88,7 +88,7 @@ def fifteen_offset(coord):
     return (coord // 30) * 30 + 15
 
 
-def get_cfg(cfgfile='/some/config/file/path'):
+def get_cfg(cfgfile='ccdc.cfg'):
     cfg_info = {}
 
     config = ConfigParser.ConfigParser()

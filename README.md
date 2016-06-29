@@ -2,3 +2,5 @@ This is to support science operations in relation to the Continuous Change Detec
 algorithm at EROS and should not be used for production
 
 Many of the individual components have been cobbled together from other projects.
+
+Not meant to go out into distribution either.

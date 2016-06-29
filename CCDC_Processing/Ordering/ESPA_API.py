@@ -8,6 +8,7 @@ class APIException(Exception):
 class APIConnect(object):
     def __init__(self, username, password, host):
         self.host = host
+        self.username = username
 
         self.auth_tpl = (username, password)
 
@@ -67,7 +68,7 @@ class APIConnect(object):
 
         return False
 
-    def available_prods(self, scene_list):
+    def post_available_prods(self, scene_list):
         data_dict = {'inputs': scene_list}
         url = '/available-products'
 
@@ -75,7 +76,7 @@ class APIConnect(object):
 
         return resp
 
-    def place_order(self, espa_order):
+    def post_order(self, espa_order):
         url = '/order'
 
         resp, status = self._request('post', url, json=espa_order, status=200)
