@@ -75,3 +75,5 @@ contest.py
 
 # ipython
 *.ipynb
+
+ccdc.cfg

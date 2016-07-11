@@ -4,34 +4,75 @@ import urllib
 
 import psycopg2
 
-from CCDC_Processing.utils import DBConnect
+from CCDC_Processing.utils import DBConnect, get_cfg, epsg_from_file
 
 
-def query_shape(shapepath, listpath, metatbl):
-    """
-    Queries a shape file against the Landsat metadata to determine
-    all intersecting scenes
-    :param shapepath: input path to shape file
-    :param listpath: output path for the scene list
-    :param metatbl: Landsat metadata table, can inlcude schema
-    :return: None
-    """
-    call = 'ogr2ogr -f PostgreSQL PG:"dbname=PostGIS user=postgres" %s -nln shp_temp\
-           -skipfailures -overwrite' % shapepath
-    subprocess.call(call, shell=True)
+class LandsatMeta(object):
+    def __init__(self, config=None):
+        if not config:
+            config = get_cfg()
 
-    pgstr = """copy (select sceneid from %s, shp_temp
-             where st_intersects(%s.geom, st_transform(shp_temp.wkb_geometry, 4326))
-             and sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
-             and dayornight = 'DAY'
-             and acquisitiondate between '1983-01-01'::DATE and '2014-12-31'::DATE)
-             to '%s'"""
+        self.db_connection = {'host': config['db'].get('host'),
+                              'database': config['db'].get('database'),
+                              'user': config['db'].get('user'),
+                              'password': config['db'].get('password'),
+                              'port': config['db'].get('port')}
 
-    pgrmtable = 'drop table shp_temp cascade'
+        self.landsat_table = config['db'].get('landsatmeta')
+        self.shp2psql = config['db'].get('shp2psql')
+        self.psql = config['db'].get('psql')
 
-    with DBConnect(autocommit=True) as db:
-        db.execute(pgstr % (metatbl, metatbl, listpath))
-        db.execute(pgrmtable)
+    def query_shape(self, shapepath):
+        """
+        Queries a shape file against the Landsat metadata to determine
+        all intersecting scenes
+
+        :param shapepath: input path to shape file
+        :param listpath: output path for the scene list
+        :return: None
+        """
+        spatialref = epsg_from_file(shapepath)
+
+        psql_in = subprocess.Popen([self.psql,
+                                    '-h {}'.format(self.db_connection['host']),
+                                    '-p {}'.format(self.db_connection['port']),
+                                    '-P {}'.format(self.db_connection['password']),
+                                    '-u {}'.format(self.db_connection['user']),
+                                    '-d {}'.format(self.db_connection['database'])],
+                                   stdout=subprocess.PIPE)
+
+        psql_out = subprocess.Popen([self.shp2psql, '-s {}:4326'.format(spatialref), 'shp_tmp'], stdin=psql_in.stdout)
+
+        psql_in.wait()
+
+        pgstr = """copy (select sceneid from %s, shp_temp
+                 where st_intersects(%s.geom, shp_temp.geom)
+                 and sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
+                 and dayornight = 'DAY'
+                 and acquisitiondate between '1983-01-01'::DATE and '2014-12-31'::DATE)
+                 to '%s'"""
+        sql = '''select distinct sceneid
+                 from landsat_meta
+                 where sensor = 'OLI_TIRS'
+                 and nadir_offnadir = 'NADIR'
+                 and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE
+                 and data_type in ('L1T', 'L1GT')
+                 and dayornight = 'DAY'
+
+                 union
+
+                 select distinct sceneid
+                 from landsat_meta
+                 where sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
+                 and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE
+                 and data_type = 'L1T'
+                 and dayornight = 'DAY';'''
+
+        pgrmtable = 'drop table shp_temp cascade'
+
+        with DBConnect(**self.db_connection) as db:
+            db.execute(pgstr % (metatbl, metatbl, listpath))
+            db.execute(pgrmtable)
 
 
 def landsat_meta(tableid):
@@ -235,7 +276,3 @@ def update_table(csv_path, table_id='landsat_meta'):
         for x in range(len(sql_commands)):
             print steps[x]
             db.execute(sql_commands[x])
-
-
-if __name__ == '__main__':
-    landsat_meta('landsat_meta')

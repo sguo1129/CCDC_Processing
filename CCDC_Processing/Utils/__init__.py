@@ -84,6 +84,14 @@ def calc_ext(shapefile):
     return xmin, ymax, xmax, ymin
 
 
+def epsg_from_file(shapefile):
+    ds = ogr.Open(shapefile)
+    layer = ds.GetLayer()
+    spatialref = layer.GetSpatialRef()
+
+    return spatialref.ExportToEPSG()
+
+
 def fifteen_offset(coord):
     return (coord // 30) * 30 + 15
 

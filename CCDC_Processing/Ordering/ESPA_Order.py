@@ -1,7 +1,14 @@
 from CCDC_Processing.ordering.ESPA_API import APIConnect
+import CCDC_Processing.utils as utils
+
+
+class ESPAOrderException(Exception):
+    pass
 
 
 class ESPAOrder(APIConnect):
+    lcmap_prods = ['sr', 'toa', 'cloud', 'bt', 'source_metadata']
+
     def __init__(self, username, password, host):
         super(ESPAOrder, self).__init__(username, password, host)
 
@@ -13,6 +20,18 @@ class ESPAOrder(APIConnect):
             raise TypeError
 
         self.espa_order.update(sensor)
+
+    def add_acquisitions_from_list(self, acq_list):
+        avail = self.post_available_prods(acq_list)
+
+        if 'not_implemented' or 'date_restricted' in avail:
+            raise ESPAOrderException('Acquisition list contains errors: {}'.format(avail))
+
+        for sensor in avail:
+            avail[sensor].pop('outputs')
+            avail[sensor]['products'] = [_ for _ in self.lcmap_prods]
+
+        self.espa_order.update(avail)
 
     def add_extent(self, xmin, xmax, ymin, ymax):
         upd = {'image_extents': {'north': ymax,
@@ -59,3 +78,12 @@ class AlbersProjections(object):
                       'false_easting': 0,
                       'false_northing': 0,
                       'datum': 'wgs84'}}
+
+
+def order_instance(config_path=None):
+    if not config_path:
+        cfg = utils.get_cfg()
+    else:
+        cfg = utils.get_cfg(config_path)
+
+    return ESPAOrder(**cfg['API'])
