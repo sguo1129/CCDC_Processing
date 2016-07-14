@@ -1,7 +1,7 @@
 import argparse
 
-from CCDC_Processing.ordering import ESPA_Order, landsat_meta
-from CCDC_Processing import utils
+from CCDC_Processing.Ordering import ESPA_Order, landsat_meta
+from CCDC_Processing import Utils
 
 
 parser = argparse.ArgumentParser(prog='LCMAP/CCDC Ordering Helper')

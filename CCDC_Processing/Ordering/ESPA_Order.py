@@ -1,5 +1,5 @@
-from CCDC_Processing.ordering.ESPA_API import APIConnect
-import CCDC_Processing.utils as utils
+from CCDC_Processing.Ordering.ESPA_API import APIConnect
+import CCDC_Processing.Utils as utils
 
 
 class ESPAOrderException(Exception):
@@ -81,8 +81,8 @@ class AlbersProjections(object):
 
 def order_instance(config_path=None):
     if not config_path:
-        cfg = utils.get_cfg()
+        cfg = Utils.get_cfg()
     else:
-        cfg = utils.get_cfg(config_path)
+        cfg = Utils.get_cfg(config_path)
 
     return ESPAOrder(**cfg['API'])
