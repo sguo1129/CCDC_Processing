@@ -28,8 +28,11 @@ class DBConnect(object):
         if self.autocommit:
             self.commit()
 
-    def select(self, sql_str):
-        self.cursor.execute(sql_str)
+    def select(self, sql_str, vals):
+        if not isinstance(vals, tuple):
+            raise TypeError
+
+        self.cursor.execute(sql_str, vals)
 
         try:
             self.fetcharr = self.cursor.fetchall()

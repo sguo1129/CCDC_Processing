@@ -36,7 +36,8 @@ class ESPAOrder(APIConnect):
         upd = {'image_extents': {'north': ymax,
                                  'south': ymin,
                                  'east': xmax,
-                                 'west': xmin}}
+                                 'west': xmin,
+                                 'units': 'meters'}}
 
         self.espa_order.update(upd)
 
@@ -60,7 +61,7 @@ class AlbersProjections(object):
                      'latitude_of_origin': 23,
                      'false_easting': 0,
                      'false_northing': 0,
-                     'datum': 'wgs84'}}
+                     'datum': 'nad83'}}
 
     alaska = {'aea': {'standard_parallel_1': 55,
                       'standard_parallel_2': 65,
@@ -68,7 +69,7 @@ class AlbersProjections(object):
                       'latitude_of_origin': 50,
                       'false_easting': 0,
                       'false_northing': 0,
-                      'datum': 'wgs84'}}
+                      'datum': 'nad83'}}
 
     hawaii = {'aea': {'standard_parallel_1': 8,
                       'standard_parallel_2': 18,
@@ -76,13 +77,13 @@ class AlbersProjections(object):
                       'latitude_of_origin': 3,
                       'false_easting': 0,
                       'false_northing': 0,
-                      'datum': 'wgs84'}}
+                      'datum': 'nad83'}}
 
 
 def order_instance(config_path=None):
     if not config_path:
-        cfg = Utils.get_cfg()
+        cfg = utils.get_cfg()
     else:
-        cfg = Utils.get_cfg(config_path)
+        cfg = utils.get_cfg(config_path)
 
     return ESPAOrder(**cfg['API'])

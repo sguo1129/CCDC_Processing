@@ -41,12 +41,12 @@ class APIConnect(object):
             raise APIException(e)
 
         if status and resp.status_code != status:
-            self._unexpected_status(resp.status_code, url)
+            self._unexpected_status(resp.status_code, url, resp)
 
         return resp.json(), resp.status_code
 
     @staticmethod
-    def _unexpected_status(code, url):
+    def _unexpected_status(code, url, resp):
         """
         Throw exception for an unhandled http status
         Args:
@@ -54,19 +54,15 @@ class APIConnect(object):
             url: URL that was used
         """
         raise Exception('Received unexpected status code: {}\n'
-                        'for URL: {}'.format(code, url))
+                        'for URL: {}\n'
+                        'Reason given: {}'.format(code, url, resp))
 
     def test_connection(self):
         """
         Tests the base URL for the class
         Returns: True if 200 status received, else False
         """
-        resp, status = self._request('get')
-
-        if status == 200:
-            return True
-
-        return False
+        self._request('get', '/user', status=200)
 
     def post_available_prods(self, scene_list):
         data_dict = {'inputs': scene_list}

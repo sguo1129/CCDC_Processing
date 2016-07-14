@@ -3,6 +3,7 @@ import subprocess
 import urllib
 
 import psycopg2
+from psycopg2.extensions import AsIs
 
 from CCDC_Processing.Utils import DBConnect, get_cfg, epsg_from_file
 
@@ -11,68 +12,123 @@ class LandsatMeta(object):
     def __init__(self, config=None):
         if not config:
             config = get_cfg()
+        else:
+            config = get_cfg(config)
 
-        self.db_connection = {'host': config['db'].get('host'),
-                              'database': config['db'].get('database'),
-                              'user': config['db'].get('user'),
-                              'password': config['db'].get('password'),
-                              'port': config['db'].get('port')}
+        self.db_connection = {'host': config['DB'].get('host'),
+                              'database': config['DB'].get('database'),
+                              'user': config['DB'].get('user'),
+                              'password': config['DB'].get('password'),
+                              'port': config['DB'].get('port')}
 
-        self.landsat_table = config['db'].get('landsatmeta')
-        self.shp2psql = config['db'].get('shp2psql')
-        self.psql = config['db'].get('psql')
+        self.landsat_table = config['DB'].get('landsatmeta')
+        self.shp2psql = config['DB'].get('shp2psql')
+        self.psql = config['DB'].get('psql')
 
-    def query_shape(self, shapepath):
+    def query_conus_tile(self, h, v, location='CONUS'):
         """
-        Queries a shape file against the Landsat metadata to determine
-        all intersecting scenes
+        Query the landsat data for scenes interesting a specified WELD defined tile location
 
-        :param shapepath: input path to shape file
-        :param listpath: output path for the scene list
-        :return: None
+        :param h: WELD horizontal location
+        :param v: WELD vertical location
+        :param location: CONUS/Alaska/Hawaii
+        :return: list of intersecting scenes
         """
-        spatialref = epsg_from_file(shapepath)
 
-        psql_in = subprocess.Popen([self.psql,
-                                    '-h {}'.format(self.db_connection['host']),
-                                    '-p {}'.format(self.db_connection['port']),
-                                    '-P {}'.format(self.db_connection['password']),
-                                    '-u {}'.format(self.db_connection['user']),
-                                    '-d {}'.format(self.db_connection['database'])],
-                                   stdout=subprocess.PIPE)
+        # Should update table names to be more descriptive
+        if location == 'CONUS':
+            table = 'weld_grid_final_shifted'
+        elif location == 'AL':
+            table = 'something'
+        elif location == 'HI':
+            table = 'somthing'
+        else:
+            raise ValueError('Location value not recognized: {}'.format(location))
 
-        psql_out = subprocess.Popen([self.shp2psql, '-s {}:4326'.format(spatialref), 'shp_tmp'], stdin=psql_in.stdout)
-
-        psql_in.wait()
-
-        pgstr = """copy (select sceneid from %s, shp_temp
-                 where st_intersects(%s.geom, shp_temp.geom)
-                 and sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
-                 and dayornight = 'DAY'
-                 and acquisitiondate between '1983-01-01'::DATE and '2014-12-31'::DATE)
-                 to '%s'"""
-        sql = '''select distinct sceneid
-                 from landsat_meta
-                 where sensor = 'OLI_TIRS'
-                 and nadir_offnadir = 'NADIR'
-                 and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE
-                 and data_type in ('L1T', 'L1GT')
-                 and dayornight = 'DAY'
-
-                 union
-
-                 select distinct sceneid
-                 from landsat_meta
-                 where sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
-                 and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE
-                 and data_type = 'L1T'
-                 and dayornight = 'DAY';'''
-
-        pgrmtable = 'drop table shp_temp cascade'
+        # Union on the two queries seemed to give the best results
+        sql = ("select distinct sceneid "
+               "from landsat_meta, %s w "
+               "where sensor = 'OLI_TIRS' "
+               "and nadir_offnadir = 'NADIR' "
+               "and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE "
+               "and data_type in ('L1T', 'L1GT') "
+               "and dayornight = 'DAY' "
+               "and w.h = %s "
+               "and w.v = %s "
+               "and st_intersects(landsat_meta.geom, st_transform(w.geom, 4326)) "
+               "and cloudcoverfull < 100 "
+               "union "
+               "select distinct sceneid "
+               "from landsat_meta, %s w "
+               "where sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM') "
+               "and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE "
+               "and data_type = 'L1T' "
+               "and dayornight = 'DAY' "
+               "and w.h = %s "
+               "and w.v = %s "
+               "and st_intersects(landsat_meta.geom, st_transform(w.geom, 4326)) "
+               "and cloudcoverfull < 100")
 
         with DBConnect(**self.db_connection) as db:
-            db.execute(pgstr % (metatbl, metatbl, listpath))
-            db.execute(pgrmtable)
+            db.select(sql, (AsIs(table), h, v, AsIs(table), h, v))
+
+            ret = [_[0] for _ in db.fetcharr]
+
+        return ret
+
+
+
+    # def query_shape(self, shapepath):
+    #     """
+    #     Queries a shape file against the Landsat metadata to determine
+    #     all intersecting scenes
+    #
+    #     :param shapepath: input path to shape file
+    #     :param listpath: output path for the scene list
+    #     :return: None
+    #     """
+    #     spatialref = epsg_from_file(shapepath)
+    #
+    #     psql_in = subprocess.Popen([self.psql,
+    #                                 '-h {}'.format(self.db_connection['host']),
+    #                                 '-p {}'.format(self.db_connection['port']),
+    #                                 '-P {}'.format(self.db_connection['password']),
+    #                                 '-u {}'.format(self.db_connection['user']),
+    #                                 '-d {}'.format(self.db_connection['database'])],
+    #                                stdout=subprocess.PIPE)
+    #
+    #     psql_out = subprocess.Popen([self.shp2psql, '-s {}:4326'.format(spatialref), 'shp_tmp'], stdin=psql_in.stdout)
+    #
+    #     psql_in.wait()
+    #
+    #     pgstr = """copy (select sceneid from %s, shp_temp
+    #              where st_intersects(%s.geom, shp_temp.geom)
+    #              and sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
+    #              and dayornight = 'DAY'
+    #              and acquisitiondate between '1983-01-01'::DATE and '2014-12-31'::DATE)
+    #              to '%s'"""
+    #     sql = '''select distinct sceneid
+    #              from landsat_meta
+    #              where sensor = 'OLI_TIRS'
+    #              and nadir_offnadir = 'NADIR'
+    #              and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE
+    #              and data_type in ('L1T', 'L1GT')
+    #              and dayornight = 'DAY'
+    #
+    #              union
+    #
+    #              select distinct sceneid
+    #              from landsat_meta
+    #              where sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM')
+    #              and acquisitiondate between '1982-01-01'::DATE and '2015-12-31'::DATE
+    #              and data_type = 'L1T'
+    #              and dayornight = 'DAY';'''
+    #
+    #     pgrmtable = 'drop table shp_temp cascade'
+    #
+    #     # with DBConnect(**self.db_connection) as db:
+    #     #     db.execute(pgstr % (metatbl, metatbl, listpath))
+    #     #     db.execute(pgrmtable)
 
 
 def landsat_meta(tableid):
