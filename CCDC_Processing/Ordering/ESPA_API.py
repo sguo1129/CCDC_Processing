@@ -79,6 +79,20 @@ class APIConnect(object):
 
         return resp
 
+    def list_orders(self, email=''):
+        url = '/list-orders/{}'.format(email)
+
+        resp, status = self._request('get', url, status=200)
+
+        return resp
+
+    def order_status(self, order_id):
+        url = '/order/{}'.format(order_id)
+
+        resp, status = self._request('get', url, status=200)
+
+        return resp
+
     def __enter__(self):
         return self
 
