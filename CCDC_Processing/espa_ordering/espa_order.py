@@ -46,6 +46,9 @@ class ESPAOrder(utils.APIConnect):
 
         self.espa_order.update({'projection': proj})
 
+    def add_note(self, note):
+        self.espa_order.update({'note': note})
+
     def place_order(self):
         return self.post_order(self.espa_order)
 

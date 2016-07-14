@@ -25,6 +25,26 @@ class LandsatMeta(object):
         self.shp2psql = config['DB'].get('shp2psql')
         self.psql = config['DB'].get('psql')
 
+    @staticmethod
+    def _location_to_table(location):
+        """
+        Translate common name to what the actual table is called in the DB
+
+        :param location: CONUS/Alaska/Hawaii
+        :return: table name
+        """
+        # Should update table names to be more descriptive
+        if location == 'CONUS':
+            table = 'weld_grid_final_shifted'
+        elif location == 'AL':
+            table = 'something'
+        elif location == 'HI':
+            table = 'somthing'
+        else:
+            raise ValueError('Location value not recognized: {}'.format(location))
+
+        return table
+
     def query_conus_tile(self, h, v, location='CONUS'):
         """
         Query the landsat data for scenes interesting a specified WELD defined tile location
@@ -35,15 +55,7 @@ class LandsatMeta(object):
         :return: list of intersecting scenes
         """
 
-        # Should update table names to be more descriptive
-        if location == 'CONUS':
-            table = 'weld_grid_final_shifted'
-        elif location == 'AL':
-            table = 'something'
-        elif location == 'HI':
-            table = 'somthing'
-        else:
-            raise ValueError('Location value not recognized: {}'.format(location))
+        table = self._location_to_table(location)
 
         # Union on the two queries seemed to give the best results
         sql = ("select distinct sceneid "
@@ -76,7 +88,19 @@ class LandsatMeta(object):
 
         return ret
 
+    def fetch_tile_extents(self, h, v, location='CONUS'):
+        table = self._location_to_table(location)
 
+        sql = ("select st_extent(geom) "
+               "from %s "
+               "where h = %s "
+               "and v = %s")
+
+        with DBConnect(**self.db_connection) as db:
+            db.select(sql, (AsIs(table), h, v))
+            ret = db[0][0]
+
+        return ret
 
     # def query_shape(self, shapepath):
     #     """
