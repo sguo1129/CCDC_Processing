@@ -5,7 +5,7 @@ import urllib
 import psycopg2
 from psycopg2.extensions import AsIs
 
-from CCDC_Processing.Utils import DBConnect, get_cfg, epsg_from_file
+from CCDC_Processing.utils import DBConnect, get_cfg, epsg_from_file
 
 
 class LandsatMeta(object):

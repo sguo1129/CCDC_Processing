@@ -1,12 +1,11 @@
-from CCDC_Processing.Ordering.ESPA_API import APIConnect
-import CCDC_Processing.Utils as utils
+import CCDC_Processing.utils as utils
 
 
 class ESPAOrderException(Exception):
     pass
 
 
-class ESPAOrder(APIConnect):
+class ESPAOrder(utils.APIConnect):
     lcmap_prods = ['sr', 'toa', 'cloud', 'bt', 'source_metadata']
 
     def __init__(self, username, password, host):

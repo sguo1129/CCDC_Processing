@@ -1,9 +1,5 @@
 import argparse
 
-from CCDC_Processing.Ordering import ESPA_Order, landsat_meta
-from CCDC_Processing import Utils
-
-
 parser = argparse.ArgumentParser(prog='LCMAP/CCDC Ordering Helper')
 v_group = parser.add_mutually_exclusive_group()
 parser.add_argument('--update', help='Update the Landsat Metadata before building the order', action='store_true')
