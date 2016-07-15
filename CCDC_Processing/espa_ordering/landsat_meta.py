@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import urllib
 
@@ -91,6 +92,8 @@ class LandsatMeta(object):
     def fetch_tile_extents(self, h, v, location='CONUS'):
         table = self._location_to_table(location)
 
+        regex = r'BOX\((.*) (.*),(.*) (.*)\)'
+
         sql = ("select st_extent(geom) "
                "from %s "
                "where h = %s "
@@ -98,9 +101,9 @@ class LandsatMeta(object):
 
         with DBConnect(**self.db_connection) as db:
             db.select(sql, (AsIs(table), h, v))
-            ret = db[0][0]
+            xmin, ymin, xmax, ymax = re.match(regex, db[0][0]).groups()
 
-        return ret
+        return round(float(xmin)), round(float(ymin)), round(float(xmax)), round(float(ymax))
 
     # def query_shape(self, shapepath):
     #     """
