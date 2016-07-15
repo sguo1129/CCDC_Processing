@@ -1,4 +1,5 @@
 import CCDC_Processing.utils as utils
+from CCDC_Processing.espa_ordering.landsat_meta import LandsatMeta
 
 
 class ESPAOrderException(Exception):
@@ -57,7 +58,7 @@ class AlbersProjections(object):
     def __setattr__(self, key, value):
         pass
 
-    conus = {'aea': {'standard_parallel_1': 29.5,
+    CONUS = {'aea': {'standard_parallel_1': 29.5,
                      'standard_parallel_2': 45.5,
                      'central_meridian': -96,
                      'latitude_of_origin': 23,
@@ -65,21 +66,21 @@ class AlbersProjections(object):
                      'false_northing': 0,
                      'datum': 'nad83'}}
 
-    alaska = {'aea': {'standard_parallel_1': 55,
-                      'standard_parallel_2': 65,
-                      'central_meridian': -154,
-                      'latitude_of_origin': 50,
-                      'false_easting': 0,
-                      'false_northing': 0,
-                      'datum': 'nad83'}}
+    AK = {'aea': {'standard_parallel_1': 55,
+                  'standard_parallel_2': 65,
+                  'central_meridian': -154,
+                  'latitude_of_origin': 50,
+                  'false_easting': 0,
+                  'false_northing': 0,
+                  'datum': 'nad83'}}
 
-    hawaii = {'aea': {'standard_parallel_1': 8,
-                      'standard_parallel_2': 18,
-                      'central_meridian': -157,
-                      'latitude_of_origin': 3,
-                      'false_easting': 0,
-                      'false_northing': 0,
-                      'datum': 'nad83'}}
+    HI = {'aea': {'standard_parallel_1': 8,
+                  'standard_parallel_2': 18,
+                  'central_meridian': -157,
+                  'latitude_of_origin': 3,
+                  'false_easting': 0,
+                  'false_northing': 0,
+                  'datum': 'nad83'}}
 
 
 def order_instance(config_path=None):
@@ -89,3 +90,36 @@ def order_instance(config_path=None):
         cfg = utils.get_cfg(config_path)
 
     return ESPAOrder(**cfg['API'])
+
+
+def order_weld_tile(h, v, location='CONUS', config=None):
+    """
+    Step through ordering all the scenes that intersect a specified WELD tile frame
+
+    :param h: horizontal tile location
+    :param v: vertical tile location
+    :param location: CONUS/AK/HI
+    :param config: config file path
+    :return: order id or error
+    """
+    # Initialize the base order and Landsat Metadata DB connection
+    order = order_instance(config)
+    meta = LandsatMeta()
+
+    # Add the projection information based on the AOI
+    proj = AlbersProjections.__getattribute__(location)
+    order.add_projection(proj)
+
+    # Retrieve the intersecting scenes for the order and extents
+    scene_ls = meta.query_tile(h, v, location)
+    xmin, ymin, xmax, ymax = meta.fetch_tile_extents(h, v, location)
+
+    # Add acquisitions and extent information
+    order.add_acquisitions_from_list(scene_ls)
+    order.add_extent(xmin, xmax, ymin, ymax)
+
+    # Add a note for easier order tracking
+    order.add_note('h{}v{} loc: {}'.format(h, v, location))
+
+    # Place the order and return the subsequent order_id or error
+    return order.place_order()

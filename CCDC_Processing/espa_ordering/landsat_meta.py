@@ -46,7 +46,7 @@ class LandsatMeta(object):
 
         return table
 
-    def query_conus_tile(self, h, v, location='CONUS'):
+    def query_tile(self, h, v, location='CONUS'):
         """
         Query the landsat data for scenes interesting a specified WELD defined tile location
 
