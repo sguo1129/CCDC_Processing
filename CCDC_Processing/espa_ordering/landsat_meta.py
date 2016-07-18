@@ -6,7 +6,8 @@ import urllib
 import psycopg2
 from psycopg2.extensions import AsIs
 
-from CCDC_Processing.utils import DBConnect, get_cfg, epsg_from_file
+from CCDC_Processing.utils import get_cfg, epsg_from_file
+from CCDC_Processing.db_connect import DBConnect
 
 
 class LandsatMeta(object):
@@ -37,10 +38,10 @@ class LandsatMeta(object):
         # Should update table names to be more descriptive
         if location == 'CONUS':
             table = 'weld_grid_final_shifted'
-        elif location == 'AL':
-            table = 'something'
-        elif location == 'HI':
-            table = 'somthing'
+        # elif location == 'AK':
+        #     table = 'something'
+        # elif location == 'HI':
+        #     table = 'somthing'
         else:
             raise ValueError('Location value not recognized: {}'.format(location))
 

@@ -1,3 +1,4 @@
+from CCDC_Processing.api_connect import APIConnect
 import CCDC_Processing.utils as utils
 from CCDC_Processing.espa_ordering.landsat_meta import LandsatMeta
 
@@ -6,7 +7,7 @@ class ESPAOrderException(Exception):
     pass
 
 
-class ESPAOrder(utils.APIConnect):
+class ESPAOrder(APIConnect):
     lcmap_prods = ['sr', 'toa', 'cloud', 'bt', 'source_metadata']
 
     def __init__(self, username, password, host):
