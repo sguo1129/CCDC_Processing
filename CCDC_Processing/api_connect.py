@@ -93,6 +93,13 @@ class APIConnect(object):
 
         return resp
 
+    def item_status(self, order_id):
+        url = '/item-status/{}'.format(order_id)
+
+        resp, status = self._request('get', url, status=200)
+
+        return resp
+
     def __enter__(self):
         return self
 
