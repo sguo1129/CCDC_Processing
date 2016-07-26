@@ -5,13 +5,17 @@ import tarfile
 import shutil
 import logging
 
+from ard_filter import ARDFiltering
+from ard_filters import Fill_10percent, Fill_20percent, NoFill_10percent, NoFill_20percent
+
+
 WORK_DIR = '/dev/shm'
 
-GDAL_PATH = os.environ.get('GDAL')
-if not GDAL_PATH:
-    raise Exception('GDAL environment variable not set')
-
-GDAL_PATH = os.path.join(GDAL_PATH, 'bin')
+# GDAL_PATH = os.environ.get('GDAL')
+# if not GDAL_PATH:
+#     raise Exception('GDAL environment variable not set')
+#
+# GDAL_PATH = os.path.join(GDAL_PATH, 'bin')
 
 LOGGER = logging.getLogger()
 handler = logging.StreamHandler()
@@ -47,12 +51,12 @@ def process_tile(file_q, prog_q, out_path, work_path):
             f.extractall(path=work_path)
 
     def translate():
-        subprocess.call('{}/gdal_translate -of ENVI -co "INTERLEAVE=BIP" {} {}'
-                        .format(GDAL_PATH, pathing['TRAN']['IN'], pathing['TRAN']['OUT']), shell=True)
+        subprocess.call('gdal_translate -of ENVI -co "INTERLEAVE=BIP" {} {}'
+                        .format(pathing['TRAN']['IN'], pathing['TRAN']['OUT']), shell=True)
 
     def vrt():
-        subprocess.call('{}/gdalbuildvrt -separate {} {}'
-                        .format(GDAL_PATH, pathing['VRT']['OUT'], pathing['VRT']['IN']), shell=True)
+        subprocess.call('gdalbuildvrt -separate {} {}'
+                        .format(pathing['VRT']['OUT'], pathing['VRT']['IN']), shell=True)
 
     def build_paths():
         base = os.path.join(out_path, tiff_base)
@@ -106,6 +110,7 @@ def process_tile(file_q, prog_q, out_path, work_path):
             os.remove(os.path.join(work_path, f))
 
     proc = work_path[-1]
+    filters = [Fill_20percent, Fill_10percent, NoFill_20percent, NoFill_10percent]
     while True:
         try:
             file = file_q.get()
@@ -124,11 +129,6 @@ def process_tile(file_q, prog_q, out_path, work_path):
             else:
                 band_list = build_tm_list()
 
-            # if not check_percent_clear():
-                # prog_q.put('Process %s: %s falls below clear threshold' % (proc, tiff_base))
-                # clean_up()
-                # continue
-
             pathing = build_paths()
 
             if os.path.exists(pathing['TRAN']['OUT']):
@@ -146,6 +146,9 @@ def process_tile(file_q, prog_q, out_path, work_path):
                 shutil.copy(pathing['GCP']['IN'], pathing['GCP']['OUT'])
             if os.path.exists(pathing['MTL']['IN']):
                 shutil.copy(pathing['MTL']['IN'], pathing['MTL']['OUT'])
+
+            with ARDFiltering(os.path.join(output_path, 'filtered'), filters) as f:
+                f.filter(pathing['TRAN']['OUT'])
 
             clean_up()
         except Exception as e:
