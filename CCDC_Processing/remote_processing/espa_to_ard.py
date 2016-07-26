@@ -3,11 +3,22 @@ import subprocess
 import multiprocessing as mp
 import tarfile
 import shutil
-
-from osgeo import gdal
-import numpy as np
+import logging
 
 WORK_DIR = '/dev/shm'
+
+GDAL_PATH = os.environ.get('GDAL')
+if not GDAL_PATH:
+    raise Exception('GDAL environment variable not set')
+
+GDAL_PATH = os.path.join(GDAL_PATH, 'bin')
+
+LOGGER = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s [%(levelname)s]: %(message)s')
+handler.setFormatter(formatter)
+LOGGER.addHandler(handler)
+LOGGER.setLevel(logging.INFO)
 
 
 def create_tiles(inpath, outpath, worker_num):
@@ -22,7 +33,7 @@ def create_tiles(inpath, outpath, worker_num):
 
     message = mp.Process(target=progress, args=(message_q, worker_num))
     message.start()
-    for i in range(worker_num):
+    for i in range(worker_num - 1):
         p_args = (file_q, message_q, outpath, work[i])
         mp.Process(target=process_tile, args=p_args).start()
 
@@ -35,15 +46,13 @@ def process_tile(file_q, prog_q, out_path, work_path):
         with tarfile.open(file) as f:
             f.extractall(path=work_path)
 
-    def warp():
-        subprocess.call('gdalwarp -of ENVI -co "INTERLEAVE=BIP" {} {}'
-                        .format(pathing['WARP']['IN'], pathing['WARP']['OUT']),
-                        shell=True, stdout=devnull, stderr=devnull)
+    def translate():
+        subprocess.call('{}/gdal_translate -of ENVI -co "INTERLEAVE=BIP" {} {}'
+                        .format(GDAL_PATH, pathing['TRAN']['IN'], pathing['TRAN']['OUT']), shell=True)
 
     def vrt():
-        subprocess.call('gdalbuildvrt -separate {} {}'
-                        .format(pathing['VRT']['OUT'], pathing['VRT']['IN']),
-                        shell=True, stdout=devnull, stderr=devnull)
+        subprocess.call('{}/gdalbuildvrt -separate {} {}'
+                        .format(GDAL_PATH, pathing['VRT']['OUT'], pathing['VRT']['IN']), shell=True)
 
     def build_paths():
         base = os.path.join(out_path, tiff_base)
@@ -53,24 +62,13 @@ def process_tile(file_q, prog_q, out_path, work_path):
 
         phs = {'VRT': {'OUT': os.path.join(work_path, tiff_base + '.vrt'),
                        'IN': ' '.join(band_list)},
-               'WARP': {'IN': os.path.join(work_path, tiff_base + '.vrt'),
-                        'OUT': os.path.join(base, tiff_base + '_MTLstack.img')},
+               'TRAN': {'IN': os.path.join(work_path, tiff_base + '.vrt'),
+                        'OUT': os.path.join(base, tiff_base + '_MTLstack')},
                'GCP': {'IN': os.path.join(work_path, tiff_base + '_GCP.txt'),
                        'OUT': os.path.join(base, tiff_base + '_GCP.txt')},
                'MTL': {'IN': os.path.join(work_path, tiff_base + '_MTL.txt'),
                        'OUT': os.path.join(base, tiff_base + '_MTL.txt')}}
         return phs
-
-    def check_percent_clear():
-        ds = gdal.Open(band_list[-1], gdal.GA_ReadOnly)
-
-        arr = ds.GetRasterBand(1).ReadAsArray()
-        bins = np.bincount(arr.ravel())
-
-        if np.sum(bins[0:2]) / np.sum(bins[:-1]).astype(np.float) > 0.20:
-            return True
-
-        return False
 
     def build_l8_list():
         return ['{}_sr_band2.tif'.format(os.path.join(work_path, tiff_base)),
@@ -107,7 +105,6 @@ def process_tile(file_q, prog_q, out_path, work_path):
         for f in os.listdir(work_path):
             os.remove(os.path.join(work_path, f))
 
-    devnull = open(os.devnull, 'w')
     proc = work_path[-1]
     while True:
         try:
@@ -117,7 +114,7 @@ def process_tile(file_q, prog_q, out_path, work_path):
                 prog_q.put('Killing process %s' % proc)
                 break
 
-            # prog_q.put('Process %s: Unpacking %s' % (proc, file))
+            prog_q.put('Process %s: Unpacking %s' % (proc, file))
             unpackage()
 
             tiff_base = base_name()
@@ -134,17 +131,17 @@ def process_tile(file_q, prog_q, out_path, work_path):
 
             pathing = build_paths()
 
-            if os.path.exists(pathing['WARP']['OUT']):
+            if os.path.exists(pathing['TRAN']['OUT']):
                 clean_up()
                 continue
 
-            # prog_q.put('Process %s: Building VRT stack for %s' % (proc, tiff_base))
+            prog_q.put('Process %s: Building VRT stack for %s' % (proc, tiff_base))
             vrt()
 
-            # prog_q.put('Process %s: Calling Warp for %s' % (proc, tiff_base))
-            warp()
+            prog_q.put('Process %s: Calling Translate for %s' % (proc, tiff_base))
+            translate()
 
-            # prog_q.put('Process %s: Moving ancillery files for %s' % (proc, tiff_base))
+            prog_q.put('Process %s: Moving ancillery files for %s' % (proc, tiff_base))
             if os.path.exists(pathing['GCP']['IN']):
                 shutil.copy(pathing['GCP']['IN'], pathing['GCP']['OUT'])
             if os.path.exists(pathing['MTL']['IN']):
@@ -152,8 +149,9 @@ def process_tile(file_q, prog_q, out_path, work_path):
 
             clean_up()
         except Exception as e:
-            # prog_q.put('Process %s: Hit an exception - %s' % (proc, e))
-            # prog_q.put('Killing process %s' % proc)
+            prog_q.put('Process %s: Hit an exception - %s' % (proc, e))
+            prog_q.put('Killing process %s' % proc)
+            clean_up()
             break
 
     os.rmdir(work_path)
@@ -176,8 +174,8 @@ def work_paths(worker_num, path):
     """Makes working directories for the multi-processing"""
 
     out = []
-    for i in range(worker_num):
-        new_path = os.path.join(path, 'working%s' % i)
+    for i in range(worker_num - 1):
+        new_path = os.path.join(path, 'espa_ard_working%s' % i)
         out.append(new_path)
         if not os.path.exists(new_path):
             os.mkdir(new_path)
@@ -191,10 +189,12 @@ def progress(prog_q, worker_num):
         message = prog_q.get()
 
         # print(message)
+        # sys.stdout.write(message)
+        LOGGER.info(message)
 
         if message[:4] == 'Kill':
             count += 1
-        if count >= worker_num:
+        if count >= worker_num - 1:
             break
 
 
@@ -202,8 +202,8 @@ if __name__ == '__main__':
     # input_path = raw_input('Tarball inputs: ')
     # output_path = raw_input('Output directory: ')
     # num = raw_input('Number of workers: ')
-    input_path = '/shared/users/klsmith/klsmith@usgs.gov-06012016-140616'
-    output_path = '/shared/users/klsmith/AL-h06v08'
-    num = 4
+    input_path = '/shared/users/klsmith/klsmith@usgs.gov-06142016-094545'
+    output_path = '/shared/users/klsmith/AL-h07v09'
+    num = 10
 
     create_tiles(input_path, output_path, int(num))
