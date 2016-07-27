@@ -108,7 +108,7 @@ def order_weld_tile(h, v, location='CONUS', config=None):
     meta = LandsatMeta()
 
     # Add the projection information based on the AOI
-    proj = AlbersProjections.__getattribute__(location)
+    proj = getattr(AlbersProjections, location)
     order.add_projection(proj)
 
     # Retrieve the intersecting scenes for the order and extents
