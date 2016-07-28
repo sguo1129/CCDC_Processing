@@ -5,7 +5,6 @@ import time
 import requests
 
 from CCDC_Processing.api_connect import api_instance
-from CCDC_Processing import utils
 
 
 host = 'http://edclpdsftp.cr.usgs.gov/orders/{}/{}'
