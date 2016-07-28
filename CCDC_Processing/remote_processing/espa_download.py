@@ -12,6 +12,9 @@ host = 'http://edclpdsftp.cr.usgs.gov/orders/{}/{}'
 
 
 def retrieve_order(output_path, order_id, config_path=None):
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
     with api_instance(config_path) as api:
         prod_status = api.item_status(order_id)['orderid'][order_id]
 
