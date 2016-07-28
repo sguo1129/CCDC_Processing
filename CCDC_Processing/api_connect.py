@@ -1,5 +1,7 @@
 import requests
 
+from CCDC_Processing import utils
+
 
 class APIException(Exception):
     pass
@@ -109,3 +111,12 @@ class APIConnect(object):
 
     def __repr__(self):
         return 'APIConnect({0}:{1})'.format(self.username, self.host)
+
+
+def api_instance(config_path=None):
+    if not config_path:
+        cfg = utils.get_cfg()
+    else:
+        cfg = utils.get_cfg(config_path)
+
+    return APIConnect(**cfg['API'])
