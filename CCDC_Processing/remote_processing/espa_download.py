@@ -23,11 +23,7 @@ def retrieve_order(output_path, order_id, config_path=None):
         url = host.format(order_id, filename)
 
         t = time.time()
-        subprocess.call(['wget',
-                         '-c'
-                         '-P',
-                         output_path,
-                         url])
+        subprocess.call('wget -c -P {} {}'.format(output_path, url), shell=True)
         print os.path.getsize(os.path.join(output_path, filename)) / 1024 / (time.time() - t) / 1024
         #
         # t = time.time()
