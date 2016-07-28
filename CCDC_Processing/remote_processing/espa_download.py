@@ -24,7 +24,8 @@ def retrieve_order(output_path, order_id, config_path=None):
 
         t = time.time()
         subprocess.call('wget -c -P {} {}'.format(output_path, url), shell=True)
-        print os.path.getsize(os.path.join(output_path, filename)) / 1024 / (time.time() - t) / 1024
+        if os.path.exists(os.path.join(output_path, filename)):
+            print os.path.getsize(os.path.join(output_path, filename)) / 1024 / (time.time() - t) / 1024
         #
         # t = time.time()
         # resp = requests.get(host.format(order_id, filename), stream=True)
