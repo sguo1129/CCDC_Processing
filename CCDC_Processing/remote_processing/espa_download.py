@@ -24,7 +24,7 @@ def retrieve_order(output_path, order_id, config_path=None):
 
         t = time.time()
         subprocess.call(['wget',
-                         '-C'
+                         '-c'
                          '-P',
                          output_path,
                          url])
