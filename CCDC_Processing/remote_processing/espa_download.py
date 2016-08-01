@@ -22,7 +22,6 @@ def retrieve_order(output_path, order_id, config_path=None):
         filename = item['product_dload_url'].split('/')[-1]
         outfile = os.path.join(output_path, filename)
         url = host.format(order_id, filename)
-        time.sleep(1)
 
         if os.path.exists(outfile):
             resp = requests.head(url)
@@ -30,6 +29,7 @@ def retrieve_order(output_path, order_id, config_path=None):
             if os.path.getsize(outfile) == resp.headers['content-length']:
                 continue
 
+        time.sleep(1)
         t = time.time()
         # subprocess.call('wget -c -P {} {}'.format(output_path, url), shell=True)
 
