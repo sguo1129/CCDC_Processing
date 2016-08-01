@@ -120,7 +120,7 @@ def order_weld_tile(h, v, location='CONUS', config=None):
     order.add_extent(xmin, xmax, ymin, ymax)
 
     # Add a note for easier order tracking
-    order.add_note('h{}v{} loc: {}'.format(h, v, location))
+    order.add_note('{}_h{}v{}'.format(location, h, v))
 
     # Place the order and return the subsequent order_id or error
     return order.place_order()
