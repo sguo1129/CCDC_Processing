@@ -90,6 +90,52 @@ class LandsatMeta(object):
 
         return ret
 
+    def baecv_tile(self, h, v, location='CONUS'):
+        """
+        Query the landsat data for scenes interesting a specified WELD defined tile location
+
+        Query for BAECV support
+
+        :param h: WELD horizontal location
+        :param v: WELD vertical location
+        :param location: CONUS/Alaska/Hawaii
+        :return: list of intersecting scenes
+        """
+        table = self._location_to_table(location)
+
+        # Union on the two queries seemed to give the best results
+        sql = ("select distinct sceneid "
+               "from landsat_meta, %s w "
+               "where sensor = 'OLI_TIRS' "
+               "and nadir_offnadir = 'NADIR' "
+               "and acquisitiondate >= '1984-01-01'::DATE "
+               "and geometric_rmse_model <= 10 "
+               "and cloudcover <= 8 "
+               "and dayornight = 'DAY' "
+               "and w.h = %s "
+               "and w.v = %s "
+               "and st_intersects(landsat_meta.geom, st_transform(w.geom, 4326)) "
+               "and cloudcoverfull < 100 "
+               "union "
+               "select distinct sceneid "
+               "from landsat_meta, %s w "
+               "where sensor in ('LANDSAT_ETM', 'LANDSAT_ETM_SLC_OFF', 'LANDSAT_TM') "
+               "and acquisitiondate >= '1984-01-01'::DATE "
+               "and geometric_rmse_model <= 10 "
+               "and cloudcover <= 8 "
+               "and dayornight = 'DAY' "
+               "and w.h = %s "
+               "and w.v = %s "
+               "and st_intersects(landsat_meta.geom, st_transform(w.geom, 4326)) "
+               "and cloudcoverfull < 100")
+
+        with DBConnect(**self.db_connection) as db:
+            db.select(sql, (AsIs(table), h, v, AsIs(table), h, v))
+
+            ret = [_[0] for _ in db.fetcharr]
+
+        return ret
+
     def fetch_tile_extents(self, h, v, location='CONUS'):
         table = self._location_to_table(location)
 
