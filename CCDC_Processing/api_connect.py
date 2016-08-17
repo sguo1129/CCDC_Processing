@@ -38,7 +38,7 @@ class APIConnect(object):
             url = self.host
 
         try:
-            resp = requests.request(method, url, auth=self.auth_tpl, **kwargs)
+            resp = requests.request(method, url, auth=self.auth_tpl, verify=False, **kwargs)
         except requests.RequestException as e:
             raise APIException(e)
 
