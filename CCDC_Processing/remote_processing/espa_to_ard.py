@@ -4,6 +4,7 @@ import multiprocessing as mp
 import tarfile
 import shutil
 import logging
+import sys
 
 from ard_filter import ARDFiltering
 from ard_filters import Fill_10percent, Fill_20percent, NoFill_10percent, NoFill_20percent
@@ -205,8 +206,11 @@ if __name__ == '__main__':
     # input_path = raw_input('Tarball inputs: ')
     # output_path = raw_input('Output directory: ')
     # num = raw_input('Number of workers: ')
+    if len(sys.argv) > 1:
+        create_tiles(sys.argv[1], sys.argv[2], int(sys.argv[3]))
+
     input_path = '/shared/users/klsmith/klsmith@usgs.gov-06142016-094545'
     output_path = '/shared/users/klsmith/AL-h07v09'
-    num = 10
+    num = 20
 
     create_tiles(input_path, output_path, int(num))
