@@ -13,7 +13,7 @@ outdir = r'D:\lcmap\matlab_compare\WA-08\klsmith\changemaps'
 min_year = 1985
 max_year = 2015
 
-num_cpus = 4
+num_cpus = 2
 
 test_image = r'D:\lcmap\matlab_compare\WA-08\LT50460271990297\LT50460271990297PAC04_MTLstack'
 
@@ -23,12 +23,12 @@ if not os.path.exists(outdir):
 
 
 def raster_info(raster_path):
-    ds = gdal.Open(test_image, gdal.GA_ReadOnly)
+    ds = gdal.Open(raster_path, gdal.GA_ReadOnly)
     return ds.GetGeoTransform(), ds.GetProjection()
 
 
-def raster_out(output_folder, cols, rows, bands, geo, proj, write_q, kill_count):
-    files = ccdc_raster_prods(output_folder, cols, rows, bands, geo, proj)
+def raster_out(output_folder, cols, rows, bands, geo, proj, write_q, kill_count, single=False, clear=False):
+    files = ccdc_rasters(output_folder, cols, rows, bands, geo, proj)
     kill_total = 0
     while True:
         if kill_total >= kill_count:
@@ -48,11 +48,11 @@ def raster_out(output_folder, cols, rows, bands, geo, proj, write_q, kill_count)
         files[f] = None
 
 
-def ccdc_raster_prods(output_path, cols, rows, bands, geo, proj):
+def ccdc_rasters(output_path, cols, rows, bands, geo, proj, update=False):
     prod_files = {'ChangeMap': None,
                   'ChangeMagMap': None,
-                  'CoverMap': None,
-                  'CoverQAMap': None,
+                  # 'CoverMap': None,
+                  # 'CoverQAMap': None,
                   'ConditionMap': None,
                   'QAMap': None,
                   'NumberMap': None
@@ -107,85 +107,96 @@ def matlab2datetime(matlab_datenum):
     return day + dayfrac
 
 
-def ccdc_raster_worker(depth, read_q, write_q):
+def ccdc_raster_multiworker(depth, read_q, write_q):
     while True:
-        prod_files = {'ChangeMap': np.full((5000, depth), 9999, dtype=np.int32),
-                      'ChangeMagMap': np.full((5000, depth), 9999, dtype=np.float),
-                      'CoverMap': np.full((5000, depth), 255, dtype=np.int32),
-                      'CoverQAMap': np.full((5000, depth), 255, dtype=np.int32),
-                      'ConditionMap': np.full((5000, depth), 9999, dtype=np.float),
-                      'QAMap': np.full((5000, depth), 255, dtype=np.int32),
-                      'NumberMap': np.full((5000, depth), 9999, dtype=np.int32)
-                      }
-
         infile = read_q.get()
 
         if infile == 'kill':
             write_q.put(('kill', None))
             break
+        else:
+            prods, offy = ccdc_raster_worker(depth, infile)
 
-        rec_cg = read_matlab_record(infile)
-        offy = int(os.path.split(infile)[-1][13:-4])
+            write_q.put((prods, offy))
 
-        pos = rec_cg['pos']
-        t_start = rec_cg['t_start']
-        t_end = rec_cg['t_end']
-        t_break = rec_cg['t_break']
-        coefs = rec_cg['coefs']
-        change_prob = rec_cg['change_prob']
-        ccdc_class = rec_cg['class']
-        categ = rec_cg['category']
-        class_qa = rec_cg['classQA']
-        mag = rec_cg['magnitude']
-        number = rec_cg['num_obs']
 
-        for i in range(len(pos)):
-            # Matlab arrays are 1 based
-            out_idx = pos[i] % 5000 - 1
+def ccdc_raster_worker(depth, infile):
+    prod_files = {'ChangeMap': np.full((5000, depth), 9999, dtype=np.int32),
+                  'ChangeMagMap': np.full((5000, depth), 9999, dtype=np.float),
+                  # 'CoverMap': np.full((5000, depth), 255, dtype=np.int32),
+                  # 'CoverQAMap': np.full((5000, depth), 255, dtype=np.int32),
+                  'ConditionMap': np.full((5000, depth), 9999, dtype=np.float),
+                  'QAMap': np.full((5000, depth), 255, dtype=np.int32),
+                  'NumberMap': np.full((5000, depth), 9999, dtype=np.int32)
+                  }
 
-            if out_idx == -1:
-                out_idx = 4999
+    rec_cg = read_matlab_record(infile)
+    offy = int(os.path.split(infile)[-1][13:-4]) - 1
 
-            dt = matlab2datetime(t_start[i])
-            year = dt.year
-            doy = dt.timetuple().tm_yday
+    pos = rec_cg['pos']
+    t_start = rec_cg['t_start']
+    t_end = rec_cg['t_end']
+    t_break = rec_cg['t_break']
+    coefs = rec_cg['coefs']
+    change_prob = rec_cg['change_prob']
+    categ = rec_cg['category']
 
-            if not 1984 < year < 2016:
-                continue
-            else:
-                year_idx = year - 1985
+    mag = rec_cg['magnitude']
+    number = rec_cg['num_obs']
 
-            # if i > 1:
-            #     if pos[i] == pos[i - 1]:
-            #         prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i]
+    # Classification
+    # class_qa = rec_cg['classQA']
+    # ccdc_class = rec_cg['class']
 
-            # EVI
+    for i in range(len(pos)):
+        # Matlab arrays are 1 based
+        out_idx = pos[i] % 5000 - 1
 
-            # coefs[<index position>][<band number>, <coefficient value>]
-            b_start = coefs[i][0, 0] + t_start[i] * coefs[i][0, 1]
-            r_start = coefs[i][2, 0] + t_start[i] * coefs[i][2, 1]
-            n_start = coefs[i][3, 0] + t_start[i] * coefs[i][3, 1]
+        if out_idx == -1:
+            out_idx = 4999
 
-            b_end = coefs[i][0, 0] + t_end[i] * coefs[i][0, 1]
-            r_end = coefs[i][2, 0] + t_end[i] * coefs[i][2, 1]
-            n_end = coefs[i][3, 0] + t_end[i] * coefs[i][3, 1]
+        dt = matlab2datetime(t_start[i])
+        year = dt.year
+        doy = dt.timetuple().tm_yday
 
-            evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
-            evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
+        if not 1984 < year < 2016:
+            continue
+        else:
+            year_idx = year - 1985
 
-            evi_slope = 10000 * (evi_end - evi_start) / (t_end[i] - t_start[i])
+        # if i > 1:
+        #     if pos[i] == pos[i - 1]:
+        #         prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i]
 
-            prod_files['ConditionMap'][out_idx, year_idx] = evi_slope
-            prod_files['QAMap'][out_idx, year_idx] = categ[i]
-            prod_files['NumberMap'][out_idx, year_idx] = number[i]
-            prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i][0]
-            prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[i][0]
+        # EVI
 
-            if change_prob[i] == 1:
-                prod_files['ChangeMap'][out_idx, year_idx] = doy
-                prod_files['ChangeMagMap'][out_idx, year_idx] = np.linalg.norm(mag[i], ord=2)
+        # coefs[<index position>][<band number>, <coefficient value>]
+        b_start = coefs[i][0, 0] + t_start[i] * coefs[i][0, 1]
+        r_start = coefs[i][2, 0] + t_start[i] * coefs[i][2, 1]
+        n_start = coefs[i][3, 0] + t_start[i] * coefs[i][3, 1]
 
-        write_q.put((prod_files, offy))
+        b_end = coefs[i][0, 0] + t_end[i] * coefs[i][0, 1]
+        r_end = coefs[i][2, 0] + t_end[i] * coefs[i][2, 1]
+        n_end = coefs[i][3, 0] + t_end[i] * coefs[i][3, 1]
+
+        evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
+        evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
+
+        evi_slope = 10000 * (evi_end - evi_start) / (t_end[i] - t_start[i])
+
+        prod_files['ConditionMap'][out_idx, year_idx] = evi_slope
+        prod_files['QAMap'][out_idx, year_idx] = categ[i]
+        prod_files['NumberMap'][out_idx, year_idx] = number[i]
+
+        # Classification
+        # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i][0]
+        # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[i][0]
+
+        if change_prob[i] == 1:
+            prod_files['ChangeMap'][out_idx, year_idx] = doy
+            prod_files['ChangeMagMap'][out_idx, year_idx] = np.linalg.norm(mag[i], ord=2)
+
+        return prod_files, offy
 
 
 def build_read_queue(input_dir, read_q):
@@ -196,7 +207,24 @@ def build_read_queue(input_dir, read_q):
         read_q.put(os.path.join(input_dir, f))
 
 
-def run():
+def single_run():
+    geo, proj = raster_info(test_image)
+    files = ccdc_rasters(outdir, 5000, 5000, 30, geo, proj)
+
+    for f in os.listdir(indir):
+        print f
+        prods, offy = ccdc_raster_worker(5000, os.path.join(indir, f))
+
+        for p in prods:
+            for b in range(30):
+                # print p, offy, f
+                files[p].GetRasterBand(b + 1).WriteArray(prods[p][:, b].reshape(1, 5000), 0, offy)
+
+    for f in files:
+        files[f] = None
+
+
+def multi_run():
     write_q = mp.Queue()
     read_q = mp.Queue()
 
@@ -204,9 +232,9 @@ def run():
     geo, proj = raster_info(test_image)
 
     for i in range(num_cpus - 1):
-        mp.Process(target=ccdc_raster_worker, args=(5000, read_q, write_q)).start()
+        mp.Process(target=ccdc_raster_multiworker, args=(5000, read_q, write_q)).start()
 
     raster_out(output_folder=outdir, bands=30, rows=5000, cols=5000, kill_count=3, write_q=write_q, geo=geo, proj=proj)
 
 if __name__ == '__main__':
-    run()
+    single_run()
