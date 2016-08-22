@@ -124,3 +124,37 @@ def order_weld_tile(h, v, location='CONUS', config=None):
 
     # Place the order and return the subsequent order_id or error
     return order.place_order()
+
+
+def order_baecv_tile(h, v, location='CONUS', config=None):
+    """
+    Step through ordering all the scenes that intersect a specified WELD tile frame
+
+    :param h: horizontal tile location
+    :param v: vertical tile location
+    :param location: CONUS/AK/HI
+    :param config: config file path
+    :return: order id or error
+    """
+
+    # Initialize the base order and Landsat Metadata DB connection
+    order = order_instance(config)
+    meta = LandsatMeta()
+
+    # Add the projection information based on the AOI
+    proj = getattr(AlbersProjections, location)
+    order.add_projection(proj)
+
+    # Retrieve the intersecting scenes for the order and extents
+    scene_ls = meta.baecv_tile(h, v, location)
+    xmin, ymin, xmax, ymax = meta.fetch_tile_extents(h, v, location)
+
+    # Add acquisitions and extent information
+    order.add_acquisitions_from_list(scene_ls)
+    order.add_extent(xmin, xmax, ymin, ymax)
+
+    # Add a note for easier order tracking
+    order.add_note('BAECV {}_h{}v{}'.format(location, h, v))
+
+    # Place the order and return the subsequent order_id or error
+    return order.place_order()
