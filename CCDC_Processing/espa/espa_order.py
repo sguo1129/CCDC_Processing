@@ -1,6 +1,6 @@
-from CCDC_Processing.api_connect import APIConnect
 import CCDC_Processing.utils as utils
-from CCDC_Processing.espa_ordering.landsat_meta import LandsatMeta
+from CCDC_Processing.api_connect import APIConnect
+from CCDC_Processing.landsat_meta import LandsatMeta
 
 
 class ESPAOrderException(Exception):

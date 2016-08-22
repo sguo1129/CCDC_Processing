@@ -318,7 +318,7 @@ class LandsatMeta(object):
         with DBConnect(**self.db_connection) as db:
             sql_string = "select column_name from information_schema.columns where table_name =\
              '%s' and table_schema = 'public';" % table_id
-            db.select(sql_string)
+            db.select(sql_string, tuple())
             cols_ls = [x[0] for x in db]
             csv_cols = ','.join(cols_ls[:-1])
             tmp_cols = ['landsat_tmp.' + x for x in cols_ls]
