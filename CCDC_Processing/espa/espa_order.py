@@ -24,9 +24,10 @@ class ESPAOrder(APIConnect):
 
     def add_acquisitions_from_list(self, acq_list):
         avail = self.post_available_prods(acq_list)
+        print avail
 
-        # if 'not_implemented' or 'date_restricted' in avail:
-        #     raise ESPAOrderException('Acquisition list contains errors: {}'.format(avail))
+        avail.pop('date_restricted', None)
+        avail.pop('not_implemented', None)
 
         for sensor in avail:
             avail[sensor]['products'] = [_ for _ in self.lcmap_prods]

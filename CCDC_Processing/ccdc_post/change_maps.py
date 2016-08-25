@@ -10,21 +10,112 @@ import scipy.io as sio
 indir = r'D:\lcmap\matlab_compare\WA-08\zhe\TSFitMap'
 outdir = r'D:\lcmap\matlab_compare\WA-08\klsmith\changemaps'
 
-min_year = 1985
-max_year = 2015
-
-num_cpus = 2
-
 test_image = r'D:\lcmap\matlab_compare\WA-08\LT50460271990297\LT50460271990297PAC04_MTLstack'
 
 
-if not os.path.exists(outdir):
-    os.makedirs(outdir)
+class ChangeMap(object):
+    changemaps = ('ChangeMap', 'ChangeMagMap', 'ConditionMap',
+                  'NumberMap', 'CoverMap', 'CoverQAMap', 'QAMap')
 
+    def __init__(self, output_path, reference_file, mp=False):
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
 
-def raster_info(raster_path):
-    ds = gdal.Open(raster_path, gdal.GA_ReadOnly)
-    return ds.GetGeoTransform(), ds.GetProjection()
+        self.reference_file = reference_file
+        self.output_path = output_path
+
+        self.geo = None
+        self.proj = None
+        self.rows = None
+        self.cols = None
+
+        self.set_raster_info()
+
+        self.rec_cg = None
+
+    def set_raster_info(self):
+        ds = gdal.Open(self.reference_file, gdal.GA_ReadOnly)
+
+        self.geo = ds.GetGeoTransform()
+        self.proj = ds.GetProjection()
+        self.rows = ds.RasterYSize
+        self.cols = ds.RasterXSize
+
+        ds = None
+
+    def create_changemaps(self, input_file, multi=False):
+        rec_cg = self.read_matlab_record(input_file)
+
+        offy = int(os.path.split(input_file)[-1][13:-4]) - 1
+
+        pos = rec_cg['pos']
+        t_start = rec_cg['t_start']
+        t_end = rec_cg['t_end']
+        t_break = rec_cg['t_break']
+        coefs = rec_cg['coefs']
+        change_prob = rec_cg['change_prob']
+        categ = rec_cg['category']
+
+        mag = rec_cg['magnitude']
+        number = rec_cg['num_obs']
+
+        starts = self.get_starts(t_start)
+
+        for start in starts:
+            pass
+
+        if multi:
+            return
+        else:
+            # Write outputs
+            pass
+
+    @staticmethod
+    def get_starts(t_start):
+        return np.unique(t_start)
+
+    @staticmethod
+    def prod_data_type(product):
+        if product in ('ChangeMap', 'NumberMap'):
+            return gdal.GDT_UInt16
+        elif product in ('ChangeMagMap', 'ConditionMap'):
+            return gdal.GDT_Float32
+        elif product in ('CoverMap', 'CoverQAMap', 'QAMap'):
+            return gdal.GDT_Byte
+        else:
+            raise ValueError
+
+    @staticmethod
+    def read_matlab_record(file_path):
+        return sio.loadmat(file_path, squeeze_me=True)['rec_cg']
+
+    @staticmethod
+    def matlab2datetime(matlab_datenum):
+        day = datetime.datetime.fromordinal(int(matlab_datenum))
+        dayfrac = datetime.timedelta(days=matlab_datenum % 1) - datetime.timedelta(days=366)
+        return day + dayfrac
+
+    def get_raster_ds(self, product, year):
+        file_path = os.path.join(self.output_path, product + '_{0}.tif'.format(year))
+
+        if os.path.exists(file_path):
+            return gdal.Open(file_path)
+        else:
+            return self.create_geotif(product, year)
+
+    def create_geotif(self, product, year):
+        data_type = self.prod_data_type(product)
+
+        file_path = os.path.join(self.output_path, product + '_{0}.tif'.format(year))
+
+        ds = (gdal
+              .GetDriverByName('GTiff')
+              .Create(file_path, self.cols, self.rows, data_type))
+
+        ds.SetGeoTransform(self.geo)
+        ds.SetProjection(self.proj)
+
+        return ds
 
 
 def raster_out(output_folder, cols, rows, bands, geo, proj, write_q, kill_count, single=False, clear=False):
@@ -46,78 +137,6 @@ def raster_out(output_folder, cols, rows, bands, geo, proj, write_q, kill_count,
 
     for f in files:
         files[f] = None
-
-
-def ccdc_rasters(output_path, cols, rows, bands, geo, proj, update=False):
-    prod_files = {'ChangeMap': None,
-                  'ChangeMagMap': None,
-                  # 'CoverMap': None,
-                  # 'CoverQAMap': None,
-                  'ConditionMap': None,
-                  'QAMap': None,
-                  'NumberMap': None
-                  }
-
-    params = {'file_path': '',
-              'cols': cols,
-              'rows': rows,
-              'bands': bands,
-              'geo': geo,
-              'proj': proj,
-              'data_type': None}
-
-    for f in prod_files:
-        params['file_path'] = os.path.join(output_path, f)
-        params['data_type'] = prod_data_type(f)
-
-        prod_files[f] = create_raster(**params)
-
-    return prod_files
-
-
-def prod_data_type(product):
-    if product in ('ChangeMap', 'NumberMap'):
-        return gdal.GDT_UInt16
-    elif product in ('ChangeMagMap', 'ConditionMap'):
-        return gdal.GDT_Float32
-    elif product in ('CoverMap', 'CoverQAMap', 'QAMap'):
-        return gdal.GDT_Byte
-    else:
-        raise ValueError
-
-
-def create_raster(file_path, cols, rows, bands, geo, proj, data_type):
-    ds = (gdal
-          .GetDriverByName('GTiff')
-          .Create(file_path + '.tif', cols, rows, bands, data_type))
-
-    ds.SetGeoTransform(geo)
-    ds.SetProjection(proj)
-
-    return ds
-
-
-def read_matlab_record(file_path):
-    return sio.loadmat(file_path, squeeze_me=True)['rec_cg']
-
-
-def matlab2datetime(matlab_datenum):
-    day = datetime.datetime.fromordinal(int(matlab_datenum))
-    dayfrac = datetime.timedelta(days=matlab_datenum%1) - datetime.timedelta(days = 366)
-    return day + dayfrac
-
-
-def ccdc_raster_multiworker(depth, read_q, write_q):
-    while True:
-        infile = read_q.get()
-
-        if infile == 'kill':
-            write_q.put(('kill', None))
-            break
-        else:
-            prods, offy = ccdc_raster_worker(depth, infile)
-
-            write_q.put((prods, offy))
 
 
 def ccdc_raster_worker(depth, infile):
@@ -199,14 +218,6 @@ def ccdc_raster_worker(depth, infile):
         return prod_files, offy
 
 
-def build_read_queue(input_dir, read_q):
-    for f in os.listdir(input_dir):
-        if f[-4:] != '.mat':
-            continue
-
-        read_q.put(os.path.join(input_dir, f))
-
-
 def single_run():
     geo, proj = raster_info(test_image)
     files = ccdc_rasters(outdir, 5000, 5000, 30, geo, proj)
@@ -222,19 +233,6 @@ def single_run():
 
     for f in files:
         files[f] = None
-
-
-def multi_run():
-    write_q = mp.Queue()
-    read_q = mp.Queue()
-
-    build_read_queue(indir, read_q)
-    geo, proj = raster_info(test_image)
-
-    for i in range(num_cpus - 1):
-        mp.Process(target=ccdc_raster_multiworker, args=(5000, read_q, write_q)).start()
-
-    raster_out(output_folder=outdir, bands=30, rows=5000, cols=5000, kill_count=3, write_q=write_q, geo=geo, proj=proj)
 
 if __name__ == '__main__':
     single_run()

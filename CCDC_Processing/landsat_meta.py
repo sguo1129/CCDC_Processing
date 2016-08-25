@@ -116,6 +116,7 @@ class LandsatMeta(object):
                "and w.v = %s "
                "and st_intersects(landsat_meta.geom, st_transform(w.geom, 4326)) "
                "and cloudcoverfull < 100 "
+               "and l1_available = 'Y' "
                "union "
                "select distinct sceneid "
                "from landsat_meta, %s w "
@@ -127,7 +128,8 @@ class LandsatMeta(object):
                "and w.h = %s "
                "and w.v = %s "
                "and st_intersects(landsat_meta.geom, st_transform(w.geom, 4326)) "
-               "and cloudcoverfull < 100")
+               "and cloudcoverfull < 100 "
+               "and l1_available = 'Y' ")
 
         with DBConnect(**self.db_connection) as db:
             db.select(sql, (AsIs(table), h, v, AsIs(table), h, v))

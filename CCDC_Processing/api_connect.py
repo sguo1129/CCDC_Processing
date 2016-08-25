@@ -1,6 +1,10 @@
 import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 from CCDC_Processing import utils
+
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class APIException(Exception):
@@ -55,9 +59,9 @@ class APIConnect(object):
             code: http status that was received
             url: URL that was used
         """
-        raise Exception('Received unexpected status code: {}\n'
-                        'for URL: {}\n'
-                        'Reason given: {}'.format(code, url, resp))
+        raise APIException('Received unexpected status code: {0}\n'
+                           'for URL: {1}\n'
+                           'Reason given: {2}'.format(code, url, resp.json()))
 
     def test_connection(self):
         """
