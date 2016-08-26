@@ -1,3 +1,7 @@
+"""
+Change Maps for CCDC visualizations
+"""
+
 import os
 import datetime
 import multiprocessing as mp
