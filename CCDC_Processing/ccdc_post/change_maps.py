@@ -64,7 +64,7 @@ class ChangeMap(object):
         starts = self.get_starts(t_start)
 
         for start in starts:
-            i = np.where(t_start == start)
+            locs = np.where(t_start == start)
 
             dt = self.matlab2datetime(start)
             doy = dt.timetuple().tm_yday
@@ -80,30 +80,34 @@ class ChangeMap(object):
                    'NumberMap': np.zeros((1, 5000), dtype=np.int32)
                    }
 
-            b_start = coefs[i][0, 0] + t_start[i] * coefs[i][0, 1]
-            r_start = coefs[i][2, 0] + t_start[i] * coefs[i][2, 1]
-            n_start = coefs[i][3, 0] + t_start[i] * coefs[i][3, 1]
+            # Need to work on getting cast across the array
+            for idx in locs[0]:
 
-            b_end = coefs[i][0, 0] + t_end[i] * coefs[i][0, 1]
-            r_end = coefs[i][2, 0] + t_end[i] * coefs[i][2, 1]
-            n_end = coefs[i][3, 0] + t_end[i] * coefs[i][3, 1]
+                b_start = coefs[idx][0, 0] + t_start[idx] * coefs[idx][0, 1]
+                r_start = coefs[idx][2, 0] + t_start[idx] * coefs[idx][2, 1]
+                n_start = coefs[idx][3, 0] + t_start[idx] * coefs[idx][3, 1]
 
-            evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
-            evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
+                b_end = coefs[idx][0, 0] + t_end[idx] * coefs[idx][0, 1]
+                r_end = coefs[idx][2, 0] + t_end[idx] * coefs[idx][2, 1]
+                n_end = coefs[idx][3, 0] + t_end[idx] * coefs[idx][3, 1]
 
-            evi_slope = 10000 * (evi_end - evi_start) / (t_end[i] - t_start[i])
+                evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
+                evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
 
-            out['ConditionMap'][i] = evi_slope
-            out['QAMap'][i] = categ[i]
-            out['NumberMap'][i] = number[i]
+                evi_slope = 10000 * (evi_end - evi_start) / (t_end[idx] - t_start[idx])
+
+                out['ConditionMap'][idx] = evi_slope
+
+            out['QAMap'][locs] = categ[locs]
+            out['NumberMap'][locs] = number[locs]
 
             # Classification
-            # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i][0]
-            # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[i][0]
+            # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[locs][0]
+            # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[locs][0]
 
-            if change_prob[i] == 1:
-                out['ChangeMap'][i] = doy
-                out['ChangeMagMap'][i] = np.linalg.norm(mag[i], ord=2)
+            if change_prob[locs] == 1:
+                out['ChangeMap'][locs] = doy
+                out['ChangeMagMap'][locs] = np.linalg.norm(mag[locs], ord=2)
 
             if multi:
                 multi_out.append(out)
