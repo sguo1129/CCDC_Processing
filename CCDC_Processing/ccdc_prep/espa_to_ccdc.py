@@ -148,7 +148,7 @@ def process_tile(file_q, prog_q, out_path, work_path):
             if os.path.exists(pathing['MTL']['IN']):
                 shutil.copy(pathing['MTL']['IN'], pathing['MTL']['OUT'])
 
-            with ARDFiltering(os.path.join(output_path, 'filtered'), filters) as f:
+            with ARDFiltering(os.path.join(out_path, 'filtered'), filters) as f:
                 f.filter(pathing['TRAN']['OUT'])
 
             clean_up()

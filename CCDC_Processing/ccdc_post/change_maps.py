@@ -48,6 +48,8 @@ class ChangeMap(object):
 
         offy = int(os.path.split(input_file)[-1][13:-4]) - 1
 
+        multi_out = []
+
         pos = rec_cg['pos']
         t_start = rec_cg['t_start']
         t_end = rec_cg['t_end']
@@ -62,13 +64,64 @@ class ChangeMap(object):
         starts = self.get_starts(t_start)
 
         for start in starts:
-            pass
+            i = np.where(t_start == start)
+
+            dt = self.matlab2datetime(start)
+            doy = dt.timetuple().tm_yday
+
+            out = {'y_off': offy,
+                   'year': dt.year,
+                   'ChangeMap': np.zeros((1, 5000), dtype=np.int32),
+                   'ChangeMagMap': np.zeros((1, 5000), dtype=np.float),
+                   'CoverMap': np.zeros((1, 5000), dtype=np.int32),
+                   'CoverQAMap': np.zeros((1, 5000), dtype=np.int32),
+                   'ConditionMap': np.zeros((1, 5000), dtype=np.float),
+                   'QAMap': np.zeros((1, 5000), dtype=np.int32),
+                   'NumberMap': np.zeros((1, 5000), dtype=np.int32)
+                   }
+
+            b_start = coefs[i][0, 0] + t_start[i] * coefs[i][0, 1]
+            r_start = coefs[i][2, 0] + t_start[i] * coefs[i][2, 1]
+            n_start = coefs[i][3, 0] + t_start[i] * coefs[i][3, 1]
+
+            b_end = coefs[i][0, 0] + t_end[i] * coefs[i][0, 1]
+            r_end = coefs[i][2, 0] + t_end[i] * coefs[i][2, 1]
+            n_end = coefs[i][3, 0] + t_end[i] * coefs[i][3, 1]
+
+            evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
+            evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
+
+            evi_slope = 10000 * (evi_end - evi_start) / (t_end[i] - t_start[i])
+
+            out['ConditionMap'][i] = evi_slope
+            out['QAMap'][i] = categ[i]
+            out['NumberMap'][i] = number[i]
+
+            # Classification
+            # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i][0]
+            # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[i][0]
+
+            if change_prob[i] == 1:
+                out['ChangeMap'][i] = doy
+                out['ChangeMagMap'][i] = np.linalg.norm(mag[i], ord=2)
+
+            if multi:
+                multi_out.append(out)
+            else:
+                self.write_output(out)
 
         if multi:
-            return
-        else:
-            # Write outputs
-            pass
+            return multi_out
+
+    def write_output(self, data):
+        year = data.pop('year')
+        y_off = data.pop('y_off')
+
+        for prod in data:
+            ds = self.get_raster_ds(prod, year)
+            ds.GetRasterBand(1).WriteArry(data[prod], 0, y_off)
+
+            ds = None
 
     @staticmethod
     def get_starts(t_start):
@@ -118,121 +171,10 @@ class ChangeMap(object):
         return ds
 
 
-def raster_out(output_folder, cols, rows, bands, geo, proj, write_q, kill_count, single=False, clear=False):
-    files = ccdc_rasters(output_folder, cols, rows, bands, geo, proj)
-    kill_total = 0
-    while True:
-        if kill_total >= kill_count:
-            break
-
-        prods, offy = write_q.get(block=True)
-
-        if prods == 'kill':
-            kill_total += 1
-            continue
-
-        for p in prods:
-            for b in range(bands):
-                files[p].GetRasterBand(b + 1).WriteArray(prods[p][:, b], 0, offy)
-
-    for f in files:
-        files[f] = None
-
-
-def ccdc_raster_worker(depth, infile):
-    prod_files = {'ChangeMap': np.full((5000, depth), 9999, dtype=np.int32),
-                  'ChangeMagMap': np.full((5000, depth), 9999, dtype=np.float),
-                  # 'CoverMap': np.full((5000, depth), 255, dtype=np.int32),
-                  # 'CoverQAMap': np.full((5000, depth), 255, dtype=np.int32),
-                  'ConditionMap': np.full((5000, depth), 9999, dtype=np.float),
-                  'QAMap': np.full((5000, depth), 255, dtype=np.int32),
-                  'NumberMap': np.full((5000, depth), 9999, dtype=np.int32)
-                  }
-
-    rec_cg = read_matlab_record(infile)
-    offy = int(os.path.split(infile)[-1][13:-4]) - 1
-
-    pos = rec_cg['pos']
-    t_start = rec_cg['t_start']
-    t_end = rec_cg['t_end']
-    t_break = rec_cg['t_break']
-    coefs = rec_cg['coefs']
-    change_prob = rec_cg['change_prob']
-    categ = rec_cg['category']
-
-    mag = rec_cg['magnitude']
-    number = rec_cg['num_obs']
-
-    # Classification
-    # class_qa = rec_cg['classQA']
-    # ccdc_class = rec_cg['class']
-
-    for i in range(len(pos)):
-        # Matlab arrays are 1 based
-        out_idx = pos[i] % 5000 - 1
-
-        if out_idx == -1:
-            out_idx = 4999
-
-        dt = matlab2datetime(t_start[i])
-        year = dt.year
-        doy = dt.timetuple().tm_yday
-
-        if not 1984 < year < 2016:
-            continue
-        else:
-            year_idx = year - 1985
-
-        # if i > 1:
-        #     if pos[i] == pos[i - 1]:
-        #         prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i]
-
-        # EVI
-
-        # coefs[<index position>][<band number>, <coefficient value>]
-        b_start = coefs[i][0, 0] + t_start[i] * coefs[i][0, 1]
-        r_start = coefs[i][2, 0] + t_start[i] * coefs[i][2, 1]
-        n_start = coefs[i][3, 0] + t_start[i] * coefs[i][3, 1]
-
-        b_end = coefs[i][0, 0] + t_end[i] * coefs[i][0, 1]
-        r_end = coefs[i][2, 0] + t_end[i] * coefs[i][2, 1]
-        n_end = coefs[i][3, 0] + t_end[i] * coefs[i][3, 1]
-
-        evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
-        evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
-
-        evi_slope = 10000 * (evi_end - evi_start) / (t_end[i] - t_start[i])
-
-        prod_files['ConditionMap'][out_idx, year_idx] = evi_slope
-        prod_files['QAMap'][out_idx, year_idx] = categ[i]
-        prod_files['NumberMap'][out_idx, year_idx] = number[i]
-
-        # Classification
-        # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[i][0]
-        # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[i][0]
-
-        if change_prob[i] == 1:
-            prod_files['ChangeMap'][out_idx, year_idx] = doy
-            prod_files['ChangeMagMap'][out_idx, year_idx] = np.linalg.norm(mag[i], ord=2)
-
-        return prod_files, offy
-
-
 def single_run():
-    geo, proj = raster_info(test_image)
-    files = ccdc_rasters(outdir, 5000, 5000, 30, geo, proj)
-
     for f in os.listdir(indir):
-        print f
-        prods, offy = ccdc_raster_worker(5000, os.path.join(indir, f))
-
-        for p in prods:
-            for b in range(30):
-                # print p, offy, f
-                files[p].GetRasterBand(b + 1).WriteArray(prods[p][:, b].reshape(1, 5000), 0, offy)
-
-    for f in files:
-        files[f] = None
+        change = ChangeMap(outdir, test_image)
+        change.create_changemaps(os.path.join(indir, f))
 
 if __name__ == '__main__':
     single_run()

@@ -24,7 +24,6 @@ class ESPAOrder(APIConnect):
 
     def add_acquisitions_from_list(self, acq_list):
         avail = self.post_available_prods(acq_list)
-        print avail
 
         avail.pop('date_restricted', None)
         avail.pop('not_implemented', None)
