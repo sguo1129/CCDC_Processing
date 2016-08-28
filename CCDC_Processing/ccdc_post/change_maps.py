@@ -4,6 +4,7 @@ Change Maps for CCDC visualizations
 
 import os
 import datetime
+import logging
 import multiprocessing as mp
 
 from osgeo import gdal, osr
@@ -11,48 +12,37 @@ import numpy as np
 import scipy.io as sio
 
 
-indir = r'D:\lcmap\matlab_compare\WA-08\zhe\TSFitMap'
-outdir = r'D:\lcmap\matlab_compare\WA-08\klsmith\changemaps'
-
-test_image = r'D:\lcmap\matlab_compare\WA-08\LT50460271990297\LT50460271990297PAC04_MTLstack'
+LOGGER = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s [%(levelname)s]: %(message)s')
+handler.setFormatter(formatter)
+LOGGER.addHandler(handler)
+LOGGER.setLevel(logging.DEBUG)
 
 
 class ChangeMap(object):
-    changemaps = ('ChangeMap', 'ChangeMagMap', 'ConditionMap',
-                  'NumberMap', 'CoverMap', 'CoverQAMap', 'QAMap')
+    map_names = ('ChangeMap', 'ChangeMagMap', 'ConditionMap',
+                 'NumberMap', 'QAMap')
 
-    def __init__(self, output_path, reference_file, mp=False):
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-
-        self.reference_file = reference_file
-        self.output_path = output_path
-
-        self.geo = None
-        self.proj = None
-        self.rows = None
-        self.cols = None
-
-        self.set_raster_info()
-
+    def __init__(self):
         self.rec_cg = None
+        self.changemaps = None
 
-    def set_raster_info(self):
-        ds = gdal.Open(self.reference_file, gdal.GA_ReadOnly)
-
-        self.geo = ds.GetGeoTransform()
-        self.proj = ds.GetProjection()
-        self.rows = ds.RasterYSize
-        self.cols = ds.RasterXSize
-
-        ds = None
-
-    def create_changemaps(self, input_file, multi=False):
+    def create_changemap_dict(self, input_file):
         rec_cg = self.read_matlab_record(input_file)
 
         offy = int(os.path.split(input_file)[-1][13:-4]) - 1
+        # LOGGER.debug('Starting on line: {0}'.format(offy))
 
-        multi_out = []
+        self.changemaps = {'y_off': offy,
+                           'ChangeMap': {},
+                           'ChangeMagMap': {},
+                           # 'CoverMap': np.zeros((1, 1), dtype=np.int32),
+                           # 'CoverQAMap': np.zeros((1, 1), dtype=np.int32),
+                           'ConditionMap': {},
+                           'QAMap': {},
+                           'NumberMap': {}
+                           }
 
         pos = rec_cg['pos']
         t_start = rec_cg['t_start']
@@ -65,86 +55,46 @@ class ChangeMap(object):
         mag = rec_cg['magnitude']
         number = rec_cg['num_obs']
 
-        starts = self.get_starts(t_start)
+        for idx in range(len(pos)):
+            arr_pos = (pos[idx] - 1) % 5000
 
-        for start in starts:
-            locs = np.where(t_start == start)
+            start_dt = self.matlab2datetime(t_start[idx])
+            end_dt = self.matlab2datetime(t_end[idx])
 
-            dt = self.matlab2datetime(start)
-            doy = dt.timetuple().tm_yday
+            b_start = coefs[idx][0, 0] + t_start[idx] * coefs[idx][0, 1]
+            r_start = coefs[idx][2, 0] + t_start[idx] * coefs[idx][2, 1]
+            n_start = coefs[idx][3, 0] + t_start[idx] * coefs[idx][3, 1]
 
-            out = {'y_off': offy,
-                   'year': dt.year,
-                   'ChangeMap': np.zeros((1, 5000), dtype=np.int32),
-                   'ChangeMagMap': np.zeros((1, 5000), dtype=np.float),
-                   'CoverMap': np.zeros((1, 5000), dtype=np.int32),
-                   'CoverQAMap': np.zeros((1, 5000), dtype=np.int32),
-                   'ConditionMap': np.zeros((1, 5000), dtype=np.float),
-                   'QAMap': np.zeros((1, 5000), dtype=np.int32),
-                   'NumberMap': np.zeros((1, 5000), dtype=np.int32)
-                   }
+            b_end = coefs[idx][0, 0] + t_end[idx] * coefs[idx][0, 1]
+            r_end = coefs[idx][2, 0] + t_end[idx] * coefs[idx][2, 1]
+            n_end = coefs[idx][3, 0] + t_end[idx] * coefs[idx][3, 1]
 
-            # Need to work on getting cast across the array
-            for idx in locs[0]:
+            evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
+            evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
 
-                b_start = coefs[idx][0, 0] + t_start[idx] * coefs[idx][0, 1]
-                r_start = coefs[idx][2, 0] + t_start[idx] * coefs[idx][2, 1]
-                n_start = coefs[idx][3, 0] + t_start[idx] * coefs[idx][3, 1]
+            evi_slope = 10000 * (evi_end - evi_start) / (t_end[idx] - t_start[idx])
 
-                b_end = coefs[idx][0, 0] + t_end[idx] * coefs[idx][0, 1]
-                r_end = coefs[idx][2, 0] + t_end[idx] * coefs[idx][2, 1]
-                n_end = coefs[idx][3, 0] + t_end[idx] * coefs[idx][3, 1]
+            for yr in range(start_dt.year, end_dt.year + 1):
+                self.add_year(yr)
 
-                evi_start = 2.5 * (n_start - r_start) / (n_start + 6 * r_start - 7.5 * b_start + 10000)
-                evi_end = 2.5 * (n_end - r_end) / (n_end + 6 * r_end - 7.5 * b_end + 10000)
+                self.changemaps['ConditionMap'][yr][arr_pos] = evi_slope
+                self.changemaps['QAMap'][yr][arr_pos] = categ[idx]
+                self.changemaps['NumberMap'][yr][arr_pos] = number[idx]
 
-                evi_slope = 10000 * (evi_end - evi_start) / (t_end[idx] - t_start[idx])
+            if pos[idx] == pos[idx - 1]:
+                self.changemaps['ChangeMap'][start_dt.year][arr_pos] = start_dt.timetuple().tm_yday
+                self.changemaps['ChangeMagMap'][start_dt.year][arr_pos] = np.linalg.norm(mag[idx], ord=2)
 
-                out['ConditionMap'][idx] = evi_slope
+                # Classification
+                # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[locs][0]
+                # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[locs][0]
 
-            out['QAMap'][locs] = categ[locs]
-            out['NumberMap'][locs] = number[locs]
+        return self.changemaps
 
-            # Classification
-            # prod_files['CoverMap'][out_idx, year_idx] = ccdc_class[locs][0]
-            # prod_files['CoverQAMap'][out_idx, year_idx] = class_qa[locs][0]
-
-            if change_prob[locs] == 1:
-                out['ChangeMap'][locs] = doy
-                out['ChangeMagMap'][locs] = np.linalg.norm(mag[locs], ord=2)
-
-            if multi:
-                multi_out.append(out)
-            else:
-                self.write_output(out)
-
-        if multi:
-            return multi_out
-
-    def write_output(self, data):
-        year = data.pop('year')
-        y_off = data.pop('y_off')
-
-        for prod in data:
-            ds = self.get_raster_ds(prod, year)
-            ds.GetRasterBand(1).WriteArry(data[prod], 0, y_off)
-
-            ds = None
-
-    @staticmethod
-    def get_starts(t_start):
-        return np.unique(t_start)
-
-    @staticmethod
-    def prod_data_type(product):
-        if product in ('ChangeMap', 'NumberMap'):
-            return gdal.GDT_UInt16
-        elif product in ('ChangeMagMap', 'ConditionMap'):
-            return gdal.GDT_Float32
-        elif product in ('CoverMap', 'CoverQAMap', 'QAMap'):
-            return gdal.GDT_Byte
-        else:
-            raise ValueError
+    def add_year(self, year):
+        for c in self.map_names:
+            if year not in self.changemaps:
+                self.changemaps[c][year] = np.zeros((5000, 1))
 
     @staticmethod
     def read_matlab_record(file_path):
@@ -156,33 +106,131 @@ class ChangeMap(object):
         dayfrac = datetime.timedelta(days=matlab_datenum % 1) - datetime.timedelta(days=366)
         return day + dayfrac
 
-    def get_raster_ds(self, product, year):
-        file_path = os.path.join(self.output_path, product + '_{0}.tif'.format(year))
 
-        if os.path.exists(file_path):
-            return gdal.Open(file_path)
-        else:
-            return self.create_geotif(product, year)
+def output_maps(data, output_dir, ref_image):
+    y_off = data.pop('y_off')
 
-    def create_geotif(self, product, year):
-        data_type = self.prod_data_type(product)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-        file_path = os.path.join(self.output_path, product + '_{0}.tif'.format(year))
+    for prod in data:
+        for year in data[prod]:
+            ds = get_raster_ds(output_dir, prod, year, ref_image)
+            ds.GetRasterBand(1).WriteArray(data[prod][year].reshape(1, 5000), 0, y_off)
 
-        ds = (gdal
-              .GetDriverByName('GTiff')
-              .Create(file_path, self.cols, self.rows, data_type))
-
-        ds.SetGeoTransform(self.geo)
-        ds.SetProjection(self.proj)
-
-        return ds
+            ds.FlushCache()
+            ds = None
 
 
-def single_run():
-    for f in os.listdir(indir):
-        change = ChangeMap(outdir, test_image)
-        change.create_changemaps(os.path.join(indir, f))
+def get_raster_info(ref_image):
+    ds = gdal.Open(ref_image, gdal.GA_ReadOnly)
+
+    geo = ds.GetGeoTransform()
+    proj = ds.GetProjection()
+    rows = ds.RasterYSize
+    cols = ds.RasterXSize
+
+    ds = None
+
+    return geo, proj, rows, cols
+
+
+def get_raster_ds(output_dir, product, year, ref_image):
+    key = '{0}_{1}'.format(product, year)
+
+    file_path = os.path.join(output_dir, key + '.tif')
+
+    if os.path.exists(file_path):
+        ds = gdal.Open(file_path, gdal.GA_Update)
+    else:
+        ds = create_geotif(file_path, product, ref_image)
+
+    return ds
+
+
+def create_geotif(file_path, product, ref_image):
+    data_type = prod_data_type(product)
+    geo, proj, rows, cols = get_raster_info(ref_image)
+
+    ds = (gdal
+          .GetDriverByName('GTiff')
+          .Create(file_path, cols, rows, data_type))
+
+    ds.SetGeoTransform(geo)
+    ds.SetProjection(proj)
+
+    return ds
+
+
+def prod_data_type(product):
+    if product in ('ChangeMap', 'NumberMap'):
+        return gdal.GDT_UInt16
+    elif product in ('ChangeMagMap', 'ConditionMap'):
+        return gdal.GDT_Float32
+    elif product in ('CoverMap', 'CoverQAMap', 'QAMap'):
+        return gdal.GDT_Byte
+    else:
+        raise ValueError
+
+
+def multi_output(output_dir, ref_image, output_q, kill_count):
+    count = 0
+    while True:
+        if count >= kill_count:
+            break
+
+        outdata = output_q.get()
+
+        if outdata == 'kill':
+            count += 1
+            continue
+
+        LOGGER.debug('Outputting line: {0}'.format(outdata['y_off']))
+        output_maps(outdata, output_dir, ref_image)
+
+
+def multi_worker(input_q, output_q):
+    while True:
+        infile = input_q.get()
+
+        if infile == 'kill':
+            output_q.put('kill')
+            break
+
+        change = ChangeMap().create_changemap_dict(infile)
+
+        output_q.put(change)
+
+
+def single_run(input_dir, output_dir, ref_image):
+    for f in os.listdir(input_dir):
+        change = ChangeMap().create_changemap_dict(os.path.join(input_dir, f))
+        LOGGER.debug('Outputting line: {0}'.format(change['y_off']))
+        output_maps(change, output_dir, ref_image)
+
+
+def multi_run(input_dir, output_dir, ref_image, num_procs):
+    input_q = mp.Queue()
+    output_q = mp.Queue()
+
+    worker_count = num_procs - 1
+
+    for f in os.listdir(input_dir):
+        input_q.put(os.path.join(input_dir, f))
+
+    for _ in range(worker_count):
+        input_q.put('kill')
+
+    for _ in range(worker_count):
+        mp.Process(target=multi_worker, args=(input_q, output_q)).start()
+
+    multi_output(output_dir, ref_image, output_q, worker_count)
+
 
 if __name__ == '__main__':
-    single_run()
+    indir = r'D:\lcmap\matlab_compare\WA-08\zhe\TSFitMap'
+    outdir = r'D:\lcmap\matlab_compare\WA-08\klsmith\changemaps'
+
+    test_image = r'D:\lcmap\matlab_compare\WA-08\LT50460271990297\LT50460271990297PAC04_MTLstack'
+    # single_run(indir, outdir, test_image)
+    multi_run(indir, outdir, test_image, 4)
