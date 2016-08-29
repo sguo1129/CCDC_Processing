@@ -93,7 +93,7 @@ class ChangeMap(object):
 
     def add_year(self, year):
         for c in self.map_names:
-            if year not in self.changemaps:
+            if year not in self.changemaps[c]:
                 self.changemaps[c][year] = np.zeros((5000, 1))
 
     @staticmethod
@@ -154,7 +154,7 @@ def create_geotif(file_path, product, ref_image):
 
     ds = (gdal
           .GetDriverByName('GTiff')
-          .Create(file_path, cols, rows, data_type))
+          .Create(file_path, cols, rows, 1, data_type))
 
     ds.SetGeoTransform(geo)
     ds.SetProjection(proj)
