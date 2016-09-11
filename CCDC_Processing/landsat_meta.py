@@ -1,12 +1,11 @@
 import os
 import re
-import subprocess
 import urllib
 
 import psycopg2
 from psycopg2.extensions import AsIs
 
-from CCDC_Processing.utils import get_cfg, epsg_from_file
+from CCDC_Processing.utils import get_cfg
 from CCDC_Processing.db_connect import DBConnect
 
 
