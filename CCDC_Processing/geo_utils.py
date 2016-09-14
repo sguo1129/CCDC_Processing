@@ -8,7 +8,7 @@ from osgeo import gdal, ogr
 
 
 GeoExtent = namedtuple('GeoExtent', ['x_min', 'y_max', 'x_max', 'y_min'])
-GeoAffine = namedtuple('GeoAffine', ['ul_x', 'x_resolution', 'x_offset', 'ul_y', 'y_offset', 'y_resolution'])
+GeoAffine = namedtuple('GeoAffine', ['ul_x', 'x_res', 'rot_1', 'ul_y', 'rot_2', 'y_res'])
 GeoCoordinate = namedtuple('GeoCoordinate', ['x', 'y'])
 RowColumn = namedtuple('RowColumn', ['row', 'column'])
 RowColumnExtent = namedtuple('RowColumnExtent', ['ul_row', 'ul_col', 'lr_row', 'lr_col'])
@@ -38,13 +38,35 @@ def fifteen_offset(coord):
 
 
 def geo_to_rowcol(affine, coord):
-    return RowColumn(row=int(math.ceil((affine.ul_y - coord.y) / -affine.y_resolution)),
-                     column=int(math.floor((coord.x - affine.ul_x) / affine.x_resolution)))
+    """
+    Yline = (Ygeo - GT(3) - Xpixel*GT(4)) / GT(5)
+    Xpixel = (Xgeo - GT(0) - Yline*GT(2)) / GT(1)
+
+    :param affine:
+    :param coord:
+    :return:
+    """
+    # floor and ceil probably depends on rotation, but use standard for N up
+    col = math.floor((coord.x - affine.ul_x - affine.ul_y * affine.rot_1) / affine.x_res)
+    row = math.ceil((coord.y - affine.ul_y - affine.ul_x * affine.rot_2) / affine.y_res)
+
+    return RowColumn(row=int(row),
+                     column=int(col))
 
 
 def rowcol_to_geo(affine, rowcol):
-    return GeoCoordinate(x=(affine.ul_x + rowcol.column * affine.x_resolution) + affine.x_offset,
-                         y=(affine.ul_y + rowcol.row * affine.y_resolution) + affine.y_offset)
+    """
+    Xgeo = GT(0) + Xpixel*GT(1) + Yline*GT(2)
+    Ygeo = GT(3) + Xpixel*GT(4) + Yline*GT(5)
+
+    :param affine:
+    :param rowcol:
+    :return:
+    """
+    x = affine.ul_x + rowcol.column * affine.x_res + rowcol.row * affine.rot_1
+    y = affine.ul_y + rowcol.column * affine.rot_2 + rowcol.row * affine.y_res
+
+    return GeoCoordinate(x=x, y=y)
 
 
 def get_raster_ds(raster_file, readonly=True):
