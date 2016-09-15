@@ -90,17 +90,22 @@ def get_raster_geoextent(raster_file):
                      y_min=geo_lr.y, y_max=affine.ul_y)
 
 
-def array_from_extent(raster_file, geo_extent, band=1):
+def array_from_rasterband(raster_file, geo_extent=None, band=1):
     ds = get_raster_ds(raster_file)
-    affine = GeoAffine(ds.GetGeoTransform())
 
-    ul_geo = GeoCoordinate(x=geo_extent.x_min, y=geo_extent.y_max)
-    lr_geo = GeoCoordinate(x=geo_extent.x_max, y=geo_extent.y_min)
+    if geo_extent:
+        affine = GeoAffine(ds.GetGeoTransform())
 
-    ul_rc = geo_to_rowcol(affine, ul_geo)
-    lr_rc = geo_to_rowcol(affine, lr_geo)
+        ul_geo = GeoCoordinate(x=geo_extent.x_min, y=geo_extent.y_max)
+        lr_geo = GeoCoordinate(x=geo_extent.x_max, y=geo_extent.y_min)
 
-    return ds.GetRasterBand(band).ReadAsArray(ul_rc.column,
-                                              lr_rc.column - ul_rc.column,
-                                              ul_rc.row,
-                                              lr_rc.row - ul_rc.row)
+        ul_rc = geo_to_rowcol(affine, ul_geo)
+        lr_rc = geo_to_rowcol(affine, lr_geo)
+
+        return ds.GetRasterBand(band).ReadAsArray(ul_rc.column,
+                                                  lr_rc.column - ul_rc.column,
+                                                  ul_rc.row,
+                                                  lr_rc.row - ul_rc.row)
+
+    else:
+        return ds.GetRasterBand(band).ReadAsArray()
