@@ -1,5 +1,7 @@
 """
 Geospatial Utilities
+
+Many assume the standard North up, which is not always true
 """
 import math
 from collections import namedtuple
