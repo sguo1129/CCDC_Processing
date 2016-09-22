@@ -13,9 +13,9 @@ from CCDC_Processing import geo_utils, utils
 from CCDC_Processing.classification import training
 
 
-anc_files = namedtuple('anc_files', ['trends_2000', 'dem', 'aspect', 'slope', 'posidex', 'mpw'])
 anc_file_names = ('dem.img', 'aspect.img', 'slope.img', 'posidex.img', 'mpw.img')
 training_file_name = 'trends_2000.img'
+conus_extent = geo_utils.GeoExtent(x_min=-2565585, y_min=14805, x_max=2384415, y_max=3314805)
 
 
 def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
@@ -51,6 +51,28 @@ def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
     trends_path = os.path.join(anc_dir, training_file_name)
     tile_check_inputs([trends_path], raise_exc=True)
 
+    # Now we move through the input tiles, grabbing data
+    for intile in input_tiles:
+        h_loc, v_loc, loc = tile_hvloc(intile)
+        geo_ext = tile_extent_from_hv(h_loc, v_loc, loc)
+
+        trends_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_ext)
+    # Trends data only cover a small portion of CONUS, so we can
+    #   subset the data we grab
+
+
+def tile_fetch_trends(trends_path, geo_extent):
+    trends_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_extent)
+
+
+def tile_hvloc(tile_dir):
+    root, tile = os.path.split(tile_dir)
+
+    loc = tile.split('_')[0]
+    h_loc, v_loc = [int(_) for _ in re.findall(r'\d+', tile)]
+
+    return h_loc, v_loc, loc
+
 
 def tile_find_inputs(tile_dir, training_tiles=None):
     """
@@ -64,9 +86,7 @@ def tile_find_inputs(tile_dir, training_tiles=None):
     raise_exc = False
 
     root, tile = os.path.split(tile_dir)
-
-    loc = tile.split('_')[0]
-    h_loc, v_loc = [int(_) for _ in re.findall(r'\d+', tile)]
+    h_loc, v_loc, loc = tile_hvloc(tile_dir)
 
     if training_tiles:
         input_tiles += training_tiles
@@ -136,3 +156,18 @@ def tile_fmask_stats(tile_dir):
     fmask_stats[1] = 100 * fmask_stats[1] / (fmask_stats[1] + fmask_stats[2] + 0.01)
 
     return fmask_stats
+
+
+def tile_extent_from_hv(h, v, loc='conus'):
+    loc = loc.lower()
+
+    if loc == 'conus':
+        xmin = conus_extent.x_min + h * 5000 * 30
+        xmax = conus_extent.x_min + h * 5000 * 30 + 5000 * 30
+        ymax = conus_extent.y_max - v * 5000 * 30
+        ymin = conus_extent.y_max - v * 5000 * 30 - 5000 * 30
+    else:
+        raise Exception('Location not implemented: {0}'
+                        .format(loc))
+
+    return geo_utils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin)
