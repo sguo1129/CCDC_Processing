@@ -1,13 +1,10 @@
 """
 Random Forest Classification training
+
+This file should just be concerned with handling arrays of data
 """
-import os
-import re
-from itertools import starmap, product
-
 import numpy as np
-
-from CCDC_Processing import geo_utils, utils
+from sklearn.ensemble import RandomForestClassifier
 
 
 start_time = '1999-01-01'
@@ -36,3 +33,8 @@ def separate_fmask(fmask):
         ret[i][fmask == i] = 1
 
     return ret
+
+
+def train_random_forest(X, y, n_trees=100):
+    rfc = RandomForestClassifier(n_estimators=n_trees)
+    return rfc.fit(X, y)
