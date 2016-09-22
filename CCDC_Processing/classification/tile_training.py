@@ -5,6 +5,7 @@ File based classification methods
 import os
 import re
 from itertools import starmap, product
+from collections import namedtuple
 
 import numpy as np
 
@@ -12,9 +13,15 @@ from CCDC_Processing import geo_utils, utils
 from CCDC_Processing.classification import training
 
 
+anc_files = namedtuple('anc_files', ['trends_2000', 'dem', 'aspect', 'slope', 'posidex', 'mpw'])
+anc_file_names = ('dem.img', 'aspect.img', 'slope.img', 'posidex.img', 'mpw.img')
+training_file_name = 'trends_2000.img'
+
+
 def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
     """
-    Train a RFC model for the given tile using available surrounding tiles to help with training
+    Train a RFC model for the given tile using available surrounding tiles or a provided list
+    to help with training
 
     This method assumes a lot of information:
     the input directory follows the convention - tile_dir/TSFitmaps  - change detection outputs
@@ -33,7 +40,16 @@ def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
     :param training_tiles:
     :return:
     """
+    # Gather our input tiles
     input_tiles = tile_find_inputs(tile_dir, training_tiles)
+
+    # Make sure our ancillary data is available
+    anc_paths = [os.path.join(anc_dir, anc) for anc in anc_file_names]
+    tile_check_inputs(anc_paths, raise_exc=True)
+
+    # Make sure the data that is trained with is available
+    trends_path = os.path.join(anc_dir, training_file_name)
+    tile_check_inputs([trends_path], raise_exc=True)
 
 
 def tile_find_inputs(tile_dir, training_tiles=None):
@@ -64,24 +80,27 @@ def tile_find_inputs(tile_dir, training_tiles=None):
     return tile_check_inputs(input_tiles, raise_exc)
 
 
-def tile_check_inputs(input_tiles, raise_exc=False):
+def tile_check_inputs(inputs, raise_exc=False):
     """
     Make sure that only tiles present are used for training
 
-    :param input_tiles:
+    :param inputs:
     :param raise_exc:
     :return:
     """
-    mask = tile_check_existence(input_tiles)
-    if raise_exc and False in mask:
-        raise Exception('Some input tiles are missing')
+    mask = tile_check_existence(inputs)
+    ret = tuple(t for t, m in zip(inputs, mask) if m)
 
-    return tuple(t for t, m in zip(input_tiles, mask) if m)
+    if raise_exc and False in mask:
+        raise Exception('The following input data is missing: {0}'
+                        .format(list(set(inputs) - set(ret))))
+
+    return ret
 
 
 def tile_check_existence(tile_dirs):
     if isinstance(tile_dirs, str):
-        return os.path.exists(tile_dirs)
+        return tuple(os.path.exists(tile_dirs),)
     else:
         return tuple(os.path.exists(d) for d in tile_dirs)
 
