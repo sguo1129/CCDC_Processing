@@ -115,15 +115,39 @@ def order_weld_tile(h, v, location='CONUS', config=None):
     scene_ls = meta.query_tile(h, v, location)
     xmin, ymin, xmax, ymax = meta.fetch_tile_extents(h, v, location)
 
-    # Add acquisitions and extent information
-    order.add_acquisitions_from_list(scene_ls)
+    # Add extent information
     order.add_extent(xmin, xmax, ymin, ymax)
 
     # Add a note for easier order tracking
     order.add_note('{}_h{}v{}'.format(location, h, v))
 
+    # There is a 5000 scene limit on orders
+    overflow = None
+    if len(scene_ls) > 5000:
+        overflow = [_ for _ in scene_ls[5000:]]
+        scene_ls = [_ for _ in scene_ls[:5000]]
+
+    order2 = None
+    if overflow:
+        order2 = order_overflow(order, overflow, config)
+
+    # add acquisitions
+    order.add_acquisitions_from_list(scene_ls)
+
     # Place the order and return the subsequent order_id or error
-    return order.place_order()
+    if order2:
+        return order.place_order(), order2.place_order()
+    else:
+        return order.place_order()
+
+
+def order_overflow(ordertocopy, overflow, config):
+    order = order_instance(config)
+
+    order.espa_order = {k: v for k, v in ordertocopy.espa_order.items()}
+    order.add_acquisitions_from_list(overflow)
+
+    return order
 
 
 def order_baecv_tile(h, v, location='CONUS', config=None):
