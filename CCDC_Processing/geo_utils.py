@@ -13,7 +13,7 @@ GeoExtent = namedtuple('GeoExtent', ['x_min', 'y_max', 'x_max', 'y_min'])
 GeoAffine = namedtuple('GeoAffine', ['ul_x', 'x_res', 'rot_1', 'ul_y', 'rot_2', 'y_res'])
 GeoCoordinate = namedtuple('GeoCoordinate', ['x', 'y'])
 RowColumn = namedtuple('RowColumn', ['row', 'column'])
-RowColumnExtent = namedtuple('RowColumnExtent', ['ul_row', 'ul_col', 'lr_row', 'lr_col'])
+RowColumnExtent = namedtuple('RowColumnExtent', ['start_row', 'start_col', 'end_row', 'end_col'])
 
 
 def shapefile_extent(shapefile):
@@ -71,6 +71,38 @@ def rowcol_to_geo(affine, rowcol):
     return GeoCoordinate(x=x, y=y)
 
 
+def rowcolext_to_coords(rowcol_ext):
+    """
+    Split the extent into it's components
+
+    :param rowcol_ext:
+    :return:
+    """
+    ul = RowColumn(row=rowcol_ext.start_row, column=rowcol_ext.start_col)
+    lr = RowColumn(row=rowcol_ext.end_row, column=rowcol_ext.end_col)
+
+    return ul, lr
+
+
+def rowcolext_to_geoext(affine, rowcol_ext):
+    """
+    Convert extent from row/col to a spatial extent
+
+    :param affine:
+    :param rowcol_ext:
+    :return:
+    """
+    ul, lr = rowcolext_to_coords(rowcol_ext)
+
+    geo_ul = rowcol_to_geo(affine, ul)
+    geo_lr = rowcol_to_geo(affine, lr)
+
+    return GeoExtent(x_min=geo_ul.x,
+                     x_max=geo_lr.x,
+                     y_min=geo_lr.y,
+                     y_max=geo_ul.y)
+
+
 def get_raster_ds(raster_file, readonly=True):
     if readonly:
         return gdal.Open(raster_file, gdal.GA_ReadOnly)
@@ -81,7 +113,7 @@ def get_raster_ds(raster_file, readonly=True):
 def get_raster_geoextent(raster_file):
     ds = get_raster_ds(raster_file)
 
-    affine = GeoAffine(ds.GetGeoTransform())
+    affine = get_raster_affine(raster_file)
     rowcol = RowColumn(row=ds.RasterYSize, column=ds.RasterXSize)
 
     geo_lr = rowcol_to_geo(affine, rowcol)
@@ -90,11 +122,23 @@ def get_raster_geoextent(raster_file):
                      y_min=geo_lr.y, y_max=affine.ul_y)
 
 
+def get_raster_affine(raster_file):
+    """
+    Retrieve the affine/Geo Transform from a raster
+
+    :param raster_file:
+    :return:
+    """
+    ds = get_raster_ds(raster_file)
+
+    return GeoAffine(*ds.GetGeoTransform())
+
+
 def array_from_rasterband(raster_file, geo_extent=None, band=1):
     ds = get_raster_ds(raster_file)
 
     if geo_extent:
-        affine = GeoAffine(ds.GetGeoTransform())
+        affine = get_raster_affine(raster_file)
 
         ul_geo = GeoCoordinate(x=geo_extent.x_min, y=geo_extent.y_max)
         lr_geo = GeoCoordinate(x=geo_extent.x_max, y=geo_extent.y_min)
@@ -103,8 +147,8 @@ def array_from_rasterband(raster_file, geo_extent=None, band=1):
         lr_rc = geo_to_rowcol(affine, lr_geo)
 
         return ds.GetRasterBand(band).ReadAsArray(ul_rc.column,
-                                                  lr_rc.column - ul_rc.column,
                                                   ul_rc.row,
+                                                  lr_rc.column - ul_rc.column,
                                                   lr_rc.row - ul_rc.row)
 
     else:

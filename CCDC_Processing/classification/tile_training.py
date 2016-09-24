@@ -8,6 +8,8 @@ from itertools import starmap, product
 from collections import namedtuple
 
 import numpy as np
+from scipy import ndimage
+from scipy.ndimage.measurements import find_objects
 
 from CCDC_Processing import geo_utils, utils
 from CCDC_Processing.classification import training
@@ -57,12 +59,28 @@ def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
         geo_ext = tile_extent_from_hv(h_loc, v_loc, loc)
 
         trends_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_ext)
-    # Trends data only cover a small portion of CONUS, so we can
-    #   subset the data we grab
+        # Trends data only cover a small portion of CONUS, so we can
+        #   subset the data we grab
 
 
 def tile_fetch_trends(trends_path, geo_extent):
-    trends_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_extent)
+    """
+    Retrieve the patches of trends data present inside of the given GeoExtent
+
+    :param trends_path:
+    :param geo_extent:
+    :return:
+    """
+    affine = geo_utils.get_raster_affine(trends_path)
+
+    block_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_extent)
+    labels, _ = ndimage.label(block_arr)
+
+    slices = find_objects(labels)
+
+    for y, x in slices:
+
+        pass
 
 
 def tile_hvloc(tile_dir):
