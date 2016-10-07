@@ -74,6 +74,6 @@ contest.py
 .directory
 
 # ipython
-*.ipynb
+.ipynb_checkpoints
 
 ccdc.cfg

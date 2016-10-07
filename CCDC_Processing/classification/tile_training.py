@@ -47,15 +47,15 @@ def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
 
     # Make sure our ancillary data is available
     anc_paths = [os.path.join(anc_dir, anc) for anc in anc_file_names]
-    tile_check_inputs(anc_paths, raise_exc=True)
+    tile_check_for_inputs(anc_paths, raise_exc=True)
 
     # Make sure the data that is trained with is available
     trends_path = os.path.join(anc_dir, training_file_name)
-    tile_check_inputs([trends_path], raise_exc=True)
+    tile_check_for_inputs([trends_path], raise_exc=True)
 
     # Now we move through the input tiles, grabbing data
     for intile in input_tiles:
-        h_loc, v_loc, loc = tile_hvloc(intile)
+        h_loc, v_loc, loc = tile_hv_loc(intile)
         geo_ext = tile_extent_from_hv(h_loc, v_loc, loc)
 
         trends_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_ext)
@@ -83,7 +83,13 @@ def tile_fetch_trends(trends_path, geo_extent):
         pass
 
 
-def tile_hvloc(tile_dir):
+def tile_hv_loc(tile_dir):
+    """
+    Determine the h, v, and location information based on tile directory name
+
+    :param tile_dir:
+    :return:
+    """
     root, tile = os.path.split(tile_dir)
 
     loc = tile.split('_')[0]
@@ -96,6 +102,8 @@ def tile_find_inputs(tile_dir, training_tiles=None):
     """
     Determine the pathing to input ARD tiles
 
+    if training_tiles is none, then it returns available neighboring tiles
+
     :param tile_dir:
     :param training_tiles:
     :return:
@@ -104,7 +112,7 @@ def tile_find_inputs(tile_dir, training_tiles=None):
     raise_exc = False
 
     root, tile = os.path.split(tile_dir)
-    h_loc, v_loc, loc = tile_hvloc(tile_dir)
+    h_loc, v_loc, loc = tile_hv_loc(tile_dir)
 
     if training_tiles:
         input_tiles += training_tiles
@@ -115,10 +123,10 @@ def tile_find_inputs(tile_dir, training_tiles=None):
         for pot in pot_matrix:
             input_tiles.append(os.path.join(root, '{0}_h{1}v{2}'.format(loc, pot[0], pot[1])))
 
-    return tile_check_inputs(input_tiles, raise_exc)
+    return tile_check_for_inputs(input_tiles, raise_exc)
 
 
-def tile_check_inputs(inputs, raise_exc=False):
+def tile_check_for_inputs(inputs, raise_exc=False):
     """
     Make sure that only tiles present are used for training
 
@@ -137,6 +145,12 @@ def tile_check_inputs(inputs, raise_exc=False):
 
 
 def tile_check_existence(tile_dirs):
+    """
+    Check the existence of a particular directory or list of directories
+
+    :param tile_dirs:
+    :return:
+    """
     if isinstance(tile_dirs, str):
         return tuple(os.path.exists(tile_dirs),)
     else:
@@ -177,6 +191,14 @@ def tile_fmask_stats(tile_dir):
 
 
 def tile_extent_from_hv(h, v, loc='conus'):
+    """
+    Retrieve the geospatial extent for the given tile h/v
+
+    :param h:
+    :param v:
+    :param loc:
+    :return:
+    """
     loc = loc.lower()
 
     if loc == 'conus':

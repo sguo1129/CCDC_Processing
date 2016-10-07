@@ -35,6 +35,7 @@ def separate_fmask(fmask):
     return ret
 
 
-def train_random_forest(X, y, n_trees=100):
+def train_random_forest(independent, dependant, n_trees=100):
     rfc = RandomForestClassifier(n_estimators=n_trees)
-    return rfc.fit(X, y)
+
+    return rfc.fit(independent, dependant)
