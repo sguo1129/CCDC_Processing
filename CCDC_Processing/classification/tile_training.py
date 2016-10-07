@@ -11,13 +11,13 @@ import numpy as np
 from scipy import ndimage
 from scipy.ndimage.measurements import find_objects
 
-from CCDC_Processing import geo_utils, utils
+from CCDC_Processing import geo_utils as gutils
 from CCDC_Processing.classification import training
 
 
 anc_file_names = ('dem.img', 'aspect.img', 'slope.img', 'posidex.img', 'mpw.img')
 training_file_name = 'trends_2000.img'
-conus_extent = geo_utils.GeoExtent(x_min=-2565585, y_min=14805, x_max=2384415, y_max=3314805)
+conus_extent = gutils.GeoExtent(x_min=-2565585, y_min=14805, x_max=2384415, y_max=3314805)
 
 
 def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
@@ -53,34 +53,50 @@ def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
     trends_path = os.path.join(anc_dir, training_file_name)
     tile_check_for_inputs([trends_path], raise_exc=True)
 
-    # Now we move through the input tiles, grabbing data
+    # Now we move through the input tiles, grabbing relevant geo extents for all of them
+    trends_extents = []
     for intile in input_tiles:
         h_loc, v_loc, loc = tile_hv_loc(intile)
         geo_ext = tile_extent_from_hv(h_loc, v_loc, loc)
 
-        trends_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_ext)
-        # Trends data only cover a small portion of CONUS, so we can
-        #   subset the data we grab
+        # Trends data only covers a small portion of CONUS in smaller tiles, so we can
+        #   subset the data we grab from subsequent data sets
+        trends_extents.extend(tile_fetch_trends_extents(trends_path, geo_extent=geo_ext))
+
+    # Grab the model information from the TSFitmaps
+
+    # Grab the information from the input data sets
+
+    # Grab the actual trends information
 
 
-def tile_fetch_trends(trends_path, geo_extent):
+def tile_fetch_changemodels(fitmap_dir, begin_date, end_date, geo_extent):
+    pass
+
+
+def tile_fetch_ancillery(anc_dir, geo_extent):
+    pass
+
+
+def tile_fetch_trends_extents(trends_path, geo_extent):
     """
     Retrieve the patches of trends data present inside of the given GeoExtent
 
     :param trends_path:
     :param geo_extent:
-    :return:
+    :return: tuple of geo extents
     """
-    affine = geo_utils.get_raster_affine(trends_path)
+    affine = gutils.get_raster_affine(trends_path)
 
-    block_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_extent)
+    block_arr = gutils.array_from_rasterband(trends_path, geo_extent=geo_extent)
     labels, _ = ndimage.label(block_arr)
 
     slices = find_objects(labels)
 
-    for y, x in slices:
-
-        pass
+    # return geo extents so that they can be used with other data sets
+    return tuple(gutils.rowcolext_to_geoext(affine, gutils.RowColumnExtent(start_row=y.start, start_col=x.start,
+                                                                           end_row=y.stop, end_col=x.stop))
+                 for y, x in slices)
 
 
 def tile_hv_loc(tile_dir):
@@ -179,7 +195,7 @@ def tile_fmask_stats(tile_dir):
             if f[-3:] != 'MTL':
                 continue
 
-            fmask = geo_utils.array_from_rasterband(os.path.join(root, f))
+            fmask = gutils.array_from_rasterband(os.path.join(root, f))
             fmask_stats += training.separate_fmask(fmask)
 
     fmask_stats[4] = 100 * fmask_stats[4] / fmask_stats[0]
@@ -210,4 +226,4 @@ def tile_extent_from_hv(h, v, loc='conus'):
         raise Exception('Location not implemented: {0}'
                         .format(loc))
 
-    return geo_utils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin)
+    return gutils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin)

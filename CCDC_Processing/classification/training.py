@@ -35,7 +35,21 @@ def separate_fmask(fmask):
     return ret
 
 
-def train_random_forest(independent, dependant, n_trees=100):
-    rfc = RandomForestClassifier(n_estimators=n_trees)
+def create_model():
+    pass
 
-    return rfc.fit(independent, dependant)
+
+def train_model(indep_arr, dep_arr, model_func, kwargs):
+    """
+    Train a model on the given data
+    This assumes there is a fit method on the object returned by the model_func
+
+    :param indep_arr: array of independent variables
+    :param dep_arr: array of target values
+    :param model_func: type of model to use
+    :param kwargs: kwargs passed to the model_func
+    :return: fitted model
+    """
+    model = model_func(**kwargs)
+
+    return model.fit(indep_arr, dep_arr)
