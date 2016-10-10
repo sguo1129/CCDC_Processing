@@ -11,16 +11,16 @@ import numpy as np
 from scipy import ndimage
 from scipy.ndimage.measurements import find_objects
 
-from CCDC_Processing import geo_utils as gutils
+from CCDC_Processing import geo_utils
 from CCDC_Processing.classification import training
 
 
 anc_file_names = ('dem.img', 'aspect.img', 'slope.img', 'posidex.img', 'mpw.img')
 training_file_name = 'trends_2000.img'
-conus_extent = gutils.GeoExtent(x_min=-2565585, y_min=14805, x_max=2384415, y_max=3314805)
+conus_extent = geo_utils.GeoExtent(x_min=-2565585, y_min=14805, x_max=2384415, y_max=3314805)
 
 
-def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
+def file_standard_train(tile_dir, anc_dir, training_tiles=None):
     """
     Train a RFC model for the given tile using available surrounding tiles or a provided list
     to help with training
@@ -43,42 +43,44 @@ def tile_standard_train(tile_dir, anc_dir, training_tiles=None):
     :return:
     """
     # Gather our input tiles
-    input_tiles = tile_find_inputs(tile_dir, training_tiles)
+    input_tiles = file_find_inputs(tile_dir, training_tiles)
 
     # Make sure our ancillary data is available
     anc_paths = [os.path.join(anc_dir, anc) for anc in anc_file_names]
-    tile_check_for_inputs(anc_paths, raise_exc=True)
+    file_check_for_inputs(anc_paths, raise_exc=True)
 
     # Make sure the data that is trained with is available
     trends_path = os.path.join(anc_dir, training_file_name)
-    tile_check_for_inputs([trends_path], raise_exc=True)
+    file_check_for_inputs([trends_path], raise_exc=True)
 
     # Now we move through the input tiles, grabbing relevant geo extents for all of them
     trends_extents = []
     for intile in input_tiles:
-        h_loc, v_loc, loc = tile_hv_loc(intile)
-        geo_ext = tile_extent_from_hv(h_loc, v_loc, loc)
+        h_loc, v_loc, loc = file_hv_loc(intile)
+        geo_ext = file_extent_from_hv(h_loc, v_loc, loc)
 
         # Trends data only covers a small portion of CONUS in smaller tiles, so we can
         #   subset the data we grab from subsequent data sets
-        trends_extents.extend(tile_fetch_trends_extents(trends_path, geo_extent=geo_ext))
+        trends_extents.extend(file_fetch_trends_extents(trends_path, geo_extent=geo_ext))
 
     # Grab the model information from the TSFitmaps
 
     # Grab the information from the input data sets
+    anc_data = [file_fetch_ancillery(anc_paths, ext) for ext in trends_extents]
 
     # Grab the actual trends information
+    trends_data = [geo_utils.array_from_rasterband(trends_path, ext) for ext in trends_extents]
 
 
-def tile_fetch_changemodels(fitmap_dir, begin_date, end_date, geo_extent):
-    pass
+def file_fetch_changemodels(fitmap_dir, geo_extent, begin_date, end_date, tile_affine):
+    rc_ext = geo_utils.geoext_to_rowcolext(geo_extent, tile_affine)
 
 
-def tile_fetch_ancillery(anc_dir, geo_extent):
-    pass
+def file_fetch_ancillery(anc_paths, geo_extent):
+    return tuple(geo_utils.array_from_rasterband(f, geo_extent) for f in anc_paths)
 
 
-def tile_fetch_trends_extents(trends_path, geo_extent):
+def file_fetch_trends_extents(trends_path, geo_extent):
     """
     Retrieve the patches of trends data present inside of the given GeoExtent
 
@@ -86,20 +88,20 @@ def tile_fetch_trends_extents(trends_path, geo_extent):
     :param geo_extent:
     :return: tuple of geo extents
     """
-    affine = gutils.get_raster_affine(trends_path)
+    affine = geo_utils.get_raster_affine(trends_path)
 
-    block_arr = gutils.array_from_rasterband(trends_path, geo_extent=geo_extent)
+    block_arr = geo_utils.array_from_rasterband(trends_path, geo_extent=geo_extent)
     labels, _ = ndimage.label(block_arr)
 
     slices = find_objects(labels)
 
     # return geo extents so that they can be used with other data sets
-    return tuple(gutils.rowcolext_to_geoext(affine, gutils.RowColumnExtent(start_row=y.start, start_col=x.start,
-                                                                           end_row=y.stop, end_col=x.stop))
+    return tuple(geo_utils.rowcolext_to_geoext(affine, geo_utils.RowColumnExtent(start_row=y.start, start_col=x.start,
+                                                                                 end_row=y.stop, end_col=x.stop))
                  for y, x in slices)
 
 
-def tile_hv_loc(tile_dir):
+def file_hv_loc(tile_dir):
     """
     Determine the h, v, and location information based on tile directory name
 
@@ -114,7 +116,7 @@ def tile_hv_loc(tile_dir):
     return h_loc, v_loc, loc
 
 
-def tile_find_inputs(tile_dir, training_tiles=None):
+def file_find_inputs(tile_dir, training_tiles=None):
     """
     Determine the pathing to input ARD tiles
 
@@ -128,7 +130,7 @@ def tile_find_inputs(tile_dir, training_tiles=None):
     raise_exc = False
 
     root, tile = os.path.split(tile_dir)
-    h_loc, v_loc, loc = tile_hv_loc(tile_dir)
+    h_loc, v_loc, loc = file_hv_loc(tile_dir)
 
     if training_tiles:
         input_tiles += training_tiles
@@ -139,10 +141,10 @@ def tile_find_inputs(tile_dir, training_tiles=None):
         for pot in pot_matrix:
             input_tiles.append(os.path.join(root, '{0}_h{1}v{2}'.format(loc, pot[0], pot[1])))
 
-    return tile_check_for_inputs(input_tiles, raise_exc)
+    return file_check_for_inputs(input_tiles, raise_exc)
 
 
-def tile_check_for_inputs(inputs, raise_exc=False):
+def file_check_for_inputs(inputs, raise_exc=False):
     """
     Make sure that only tiles present are used for training
 
@@ -150,7 +152,7 @@ def tile_check_for_inputs(inputs, raise_exc=False):
     :param raise_exc:
     :return:
     """
-    mask = tile_check_existence(inputs)
+    mask = file_check_existence(inputs)
     ret = tuple(t for t, m in zip(inputs, mask) if m)
 
     if raise_exc and False in mask:
@@ -160,7 +162,7 @@ def tile_check_for_inputs(inputs, raise_exc=False):
     return ret
 
 
-def tile_check_existence(tile_dirs):
+def file_check_existence(tile_dirs):
     """
     Check the existence of a particular directory or list of directories
 
@@ -173,7 +175,7 @@ def tile_check_existence(tile_dirs):
         return tuple(os.path.exists(d) for d in tile_dirs)
 
 
-def tile_fmask_stats(tile_dir):
+def file_fmask_stats(tile_dir):
     """
     Generate the FMask stats for a given tile area
 
@@ -195,7 +197,7 @@ def tile_fmask_stats(tile_dir):
             if f[-3:] != 'MTL':
                 continue
 
-            fmask = gutils.array_from_rasterband(os.path.join(root, f))
+            fmask = geo_utils.array_from_rasterband(os.path.join(root, f))
             fmask_stats += training.separate_fmask(fmask)
 
     fmask_stats[4] = 100 * fmask_stats[4] / fmask_stats[0]
@@ -206,7 +208,7 @@ def tile_fmask_stats(tile_dir):
     return fmask_stats
 
 
-def tile_extent_from_hv(h, v, loc='conus'):
+def file_extent_from_hv(h, v, loc='conus'):
     """
     Retrieve the geospatial extent for the given tile h/v
 
@@ -226,4 +228,4 @@ def tile_extent_from_hv(h, v, loc='conus'):
         raise Exception('Location not implemented: {0}'
                         .format(loc))
 
-    return gutils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin)
+    return geo_utils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin)

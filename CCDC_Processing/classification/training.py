@@ -3,12 +3,14 @@ Random Forest Classification training
 
 This file should just be concerned with handling arrays of data
 """
+import datetime
+
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 
-start_time = '1999-01-01'
-end_time = '2001-12-31'
+start_time = datetime.date(1999, 1, 1)
+end_time = datetime.date(2001, 12, 31)
 
 
 def separate_fmask(fmask):
@@ -33,6 +35,10 @@ def separate_fmask(fmask):
         ret[i][fmask == i] = 1
 
     return ret
+
+
+def build_independent_array():
+    pass
 
 
 def create_model():

@@ -71,7 +71,7 @@ def rowcol_to_geo(affine, rowcol):
     return GeoCoordinate(x=x, y=y)
 
 
-def rowcolext_to_coords(rowcol_ext):
+def rowcolext_to_components(rowcol_ext):
     """
     Split the extent into it's components
 
@@ -84,6 +84,19 @@ def rowcolext_to_coords(rowcol_ext):
     return ul, lr
 
 
+def geoext_to_components(geo_ext):
+    """
+    Split the extent into it's components
+
+    :param geo_ext:
+    :return:
+    """
+    ul = GeoCoordinate(x=geo_ext.x_min, y=geo_ext.y_max)
+    lr = GeoCoordinate(x=geo_ext.x_max, y=geo_ext.y_min)
+
+    return ul, lr
+
+
 def rowcolext_to_geoext(affine, rowcol_ext):
     """
     Convert extent from row/col to a spatial extent
@@ -92,7 +105,7 @@ def rowcolext_to_geoext(affine, rowcol_ext):
     :param rowcol_ext:
     :return:
     """
-    ul, lr = rowcolext_to_coords(rowcol_ext)
+    ul, lr = rowcolext_to_components(rowcol_ext)
 
     geo_ul = rowcol_to_geo(affine, ul)
     geo_lr = rowcol_to_geo(affine, lr)
@@ -101,6 +114,25 @@ def rowcolext_to_geoext(affine, rowcol_ext):
                      x_max=geo_lr.x,
                      y_min=geo_lr.y,
                      y_max=geo_ul.y)
+
+
+def geoext_to_rowcolext(geo_extent, affine):
+    """
+    Convert a spatial extent to a row/col extent
+
+    :param geo_extent:
+    :param affine:
+    :return:
+    """
+    ul, lr = geoext_to_components(geo_extent)
+
+    rc_ul = geo_to_rowcol(affine, ul)
+    rc_lr = geo_to_rowcol(affine, lr)
+
+    return RowColumnExtent(start_row=rc_ul.row,
+                           end_row=rc_lr.row,
+                           start_col=rc_ul.column,
+                           end_col=rc_lr.column)
 
 
 def get_raster_ds(raster_file, readonly=True):
