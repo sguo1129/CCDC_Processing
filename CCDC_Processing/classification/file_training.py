@@ -53,23 +53,20 @@ def file_standard_train(tile_dir, anc_dir, training_tiles=None):
     trends_path = os.path.join(anc_dir, training_file_name)
     file_check_for_inputs([trends_path], raise_exc=True)
 
-    # Now we move through the input tiles, grabbing relevant geo extents for all of them
-    trends_extents = []
+    # Now we move through the input tiles, grabbing relevant geo extents and data for all of them
     for intile in input_tiles:
         h_loc, v_loc, loc = file_hv_loc(intile)
-        geo_ext = file_extent_from_hv(h_loc, v_loc, loc)
+        geo_ext, affine = file_extent_from_hv(h_loc, v_loc, loc)
 
         # Trends data only covers a small portion of CONUS in smaller tiles, so we can
         #   subset the data we grab from subsequent data sets
-        trends_extents.extend(file_fetch_trends_extents(trends_path, geo_extent=geo_ext))
+        trends_blocks, trends_exts = file_fetch_trends_extents(trends_path, geo_extent=geo_ext)
 
-    # Grab the model information from the TSFitmaps
+        # Grab the model information from the TSFitmaps
+        changemodels = [file_fetch_changemodels(intile, ext, )]
 
-    # Grab the information from the input data sets
-    anc_data = [file_fetch_ancillery(anc_paths, ext) for ext in trends_extents]
-
-    # Grab the actual trends information
-    trends_data = [geo_utils.array_from_rasterband(trends_path, ext) for ext in trends_extents]
+        # Grab the information from the input data sets
+        anc_data = [file_fetch_ancillery(anc_paths, ext) for ext in trends_exts]
 
 
 def file_fetch_changemodels(fitmap_dir, geo_extent, begin_date, end_date, tile_affine):
@@ -95,10 +92,16 @@ def file_fetch_trends_extents(trends_path, geo_extent):
 
     slices = find_objects(labels)
 
+    geo_exts = tuple(geo_utils.rowcolext_to_geoext(affine, geo_utils.RowColumnExtent(start_row=y.start,
+                                                                                     start_col=x.start,
+                                                                                     end_row=y.stop,
+                                                                                     end_col=x.stop))
+                     for y, x in slices)
+
+    blocks = tuple(block_arr[s] for s in slices)
+
     # return geo extents so that they can be used with other data sets
-    return tuple(geo_utils.rowcolext_to_geoext(affine, geo_utils.RowColumnExtent(start_row=y.start, start_col=x.start,
-                                                                                 end_row=y.stop, end_col=x.stop))
-                 for y, x in slices)
+    return blocks, geo_exts
 
 
 def file_hv_loc(tile_dir):
@@ -228,4 +231,5 @@ def file_extent_from_hv(h, v, loc='conus'):
         raise Exception('Location not implemented: {0}'
                         .format(loc))
 
-    return geo_utils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin)
+    return (geo_utils.GeoExtent(x_min=xmin, x_max=xmax, y_max=ymax, y_min=ymin),
+            geo_utils.GeoAffine(ul_x=xmin, x_res=30, rot_1=0, ul_y=ymax, rot_2=0, y_res=30))

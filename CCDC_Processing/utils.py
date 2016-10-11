@@ -44,4 +44,4 @@ def datetime2matlab(dt):
 
 
 def db_instance(config_file):
-    return DBConnect(**get_cfg(config_file)['db'])
+    return DBConnect(**get_cfg(config_file)['DB'])
