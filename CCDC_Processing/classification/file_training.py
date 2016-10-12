@@ -10,6 +10,7 @@ from collections import namedtuple
 import numpy as np
 from scipy import ndimage
 from scipy.ndimage.measurements import find_objects
+import scipy.io as sio
 
 from CCDC_Processing import geo_utils
 from CCDC_Processing.classification import training
@@ -42,6 +43,9 @@ def file_standard_train(tile_dir, anc_dir, training_tiles=None):
     :param training_tiles:
     :return:
     """
+    independent_arr = np.zeros(shape=(1, 5))
+    dependent_arr = np.zeros(shape=(1,))
+
     # Gather our input tiles
     input_tiles = file_find_inputs(tile_dir, training_tiles)
 
@@ -69,8 +73,27 @@ def file_standard_train(tile_dir, anc_dir, training_tiles=None):
         anc_data = [file_fetch_ancillery(anc_paths, ext) for ext in trends_exts]
 
 
+def file_massage_inputs(trends, coefs, rmse, dem, aspect, slope, posidex, mpw):
+    """
+    Convert the 2d arrays into 1d arrays
+
+    :param trends:
+    :param dem:
+    :param aspect:
+    :param slope:
+    :param posidex:
+    :param mpw:
+    :return:
+    """
+
+
 def file_fetch_changemodels(fitmap_dir, geo_extent, begin_date, end_date, tile_affine):
     rc_ext = geo_utils.geoext_to_rowcolext(geo_extent, tile_affine)
+
+    # Only need to look at the files that fall in the row/col bounds
+    # Matlab outputs are 1 based
+    for i in range(rc_ext.start_row + 1, rc_ext.end_row + 2):
+        models = sio.loadmat(os.path.join(fitmap_dir, 'record_change{0}.mat'.format(i)), squeeze_me=True)['rec_cg']
 
 
 def file_fetch_ancillery(anc_paths, geo_extent):
