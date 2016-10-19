@@ -14,6 +14,7 @@ end_time = datetime.date(2001, 12, 31)
 
 
 def classification(trends, change_models, dem, posidex, aspect, slope, mpw):
+    """stuff"""
     pass
 
 
