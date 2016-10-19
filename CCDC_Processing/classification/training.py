@@ -13,6 +13,10 @@ start_time = datetime.date(1999, 1, 1)
 end_time = datetime.date(2001, 12, 31)
 
 
+def classification(trends, change_models, dem, posidex, aspect, slope, mpw):
+    pass
+
+
 def separate_fmask(fmask):
     """
     Generate arrays based on FMask values for stats generation
