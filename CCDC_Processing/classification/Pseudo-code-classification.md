@@ -43,9 +43,10 @@ Classification - Training Part
 11. Calculate histogram bin or number of pixels for each land cover class
 12. Set time interval of a standard Landsat scene n_times to be (25/37)*number of grids used	
 13. Set number of reference for euqal number training
-    eq_num = ceil(20000*n_times); % total %
-    n_min = ceil(600*n_times); % minimum %
-    n_max = ceil(8000*n_times); % maximum % 
+    1. eq_num = ceil(20000*n_times); % total %
+    2. n_min = ceil(600*n_times); % minimum %
+    3. n_max = ceil(8000*n_times); % maximum % 
+14. Intialized selected X & Y training data by looping through number of classes
 
       
       
