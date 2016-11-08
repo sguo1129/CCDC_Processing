@@ -37,7 +37,16 @@ Classification - Training Part
       5. Put all non-zero land cover trend pixel 
       6. Increase training pixel counter plusid by 1
    5. Set row number counter to be the current row number
-8. remove out of boundary or changed pixels      
+8. remove out of boundary or changed pixels  
+9. Output RF training input X and Y arrays into output files is an option
+10. Remove disturbed classes (values of 3 and 5) and zero value pixels in land cover trend reference data
+11. Calculate histogram bin or number of pixels for each land cover class
+12. Set time interval of a standard Landsat scene n_times to be (25/37)*number of grids used	
+13. Set number of reference for euqal number training
+    eq_num = ceil(20000*n_times); % total %
+    n_min = ceil(600*n_times); % minimum %
+    n_max = ceil(8000*n_times); % maximum % 
+
       
       
    
