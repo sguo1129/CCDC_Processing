@@ -19,7 +19,10 @@ Classification - Training Part
       14. Fmask_stat(:,:,2) = 100*Fmask_stat(:,:,2)./(Fmask_stat(:,:,1)+Fmask_stat(:,:,2)+0.01);
    15. Clear land probability
       16. Fmask_stat(:,:,1) = 100*Fmask_stat(:,:,1)./(Fmask_stat(:,:,1)+Fmask_stat(:,:,2)+0.01);
-4. 
+4. Finf non-zero pixels and label them with IDs
+5. Initialize row number counter (i_row) to be -1
+6. Initialize training pixel counter (plusid) to be 0
+
       
       
 
