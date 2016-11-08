@@ -26,8 +26,18 @@ Classification - Training Part
    1. If the pixel is not equal to row number counter i_row
        Assembles all CCD outputs and prepare them as part of inputs for RF training
    2. Find the curve within a fixed time interval produced by CCD
-   3. Loop through the pixels within the fixed time interval
-   
+   3. If no pixel found within the time interval
+      continue
+   4. Else
+      1. Loop through the pixels within the fixed time interval 
+      2. Take curves that fall within the training period & remove curves that are changed within the training period
+      3. Set row number counter to be the current row number
+      4. tmp_cft(1,:) = tmp_cft(1,:)+gt_end*tmp_cft(2,:);
+      5. Assembles all NLCD ancillary data and prepare them as part of inputs for RF training
+      6. Increase training pixel counter plusid by 1
+      
+      
+      
    
 
 
