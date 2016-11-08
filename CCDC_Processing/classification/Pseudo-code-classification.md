@@ -31,11 +31,13 @@ Classification - Training Part
    4. Else
       1. Loop through the pixels within the fixed time interval 
       2. Take curves that fall within the training period & remove curves that are changed within the training period
-      3. Set row number counter to be the current row number
-      4. tmp_cft(1,:) = tmp_cft(1,:)+gt_end*tmp_cft(2,:);
-      5. Assembles all NLCD ancillary data and prepare them as part of inputs for RF training
+      3. tmp_cft(1,:) = tmp_cft(1,:)+gt_end*tmp_cft(2,:);
+      4. Assembles all NLCD ancillary data & Fmask statistics & CCD outputs and put them as X input for RF training
+      5. Put land cover trend reference data as Y input for RF training
+      5. Put all non-zero land cover trend pixel 
       6. Increase training pixel counter plusid by 1
-      
+   5. Set row number counter to be the current row number
+8. remove out of boundary or changed pixels      
       
       
    
