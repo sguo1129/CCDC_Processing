@@ -22,6 +22,15 @@ Classification - Training Part
 4. Finf non-zero pixels and label them with IDs
 5. Initialize row number counter (i_row) to be -1
 6. Initialize training pixel counter (plusid) to be 0
+7. Loop through non-zero land cover trend pixels
+   1. If the pixel is not equal to row number counter i_row
+       Assembles all CCD outputs and prepare them as part of inputs for RF training
+   2. Find the curve within a fixed time interval produced by CCD
+   3. Loop through the pixels within the fixed time interval
+   
+   
+
+
 
       
       
