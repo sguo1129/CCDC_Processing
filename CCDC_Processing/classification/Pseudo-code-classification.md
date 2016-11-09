@@ -1,4 +1,5 @@
-Classification - Training Part
+
+      Classification - Training Part
 
 1. Read in Land Cover Trend data (example_img) as reference or training data
 2. Read in ancillary data from NLCD (slope, aspect, dem, position index (posidex), maximum potential wetland (mpw))
@@ -37,36 +38,35 @@ Classification - Training Part
       5. Put all non-zero land cover trend pixel 
       6. Increase training pixel counter plusid by 1
    5. Set row number counter to be the current row number
-8. remove out of boundary or changed pixels  
+8. Remove out of boundary or changed pixels  
 9. Output RF training input X and Y arrays into output files is an option
 10. Remove disturbed classes (values of 3 and 5) and zero value pixels in land cover trend reference data
 11. Calculate histogram bin or number of pixels for each land cover class
-12. Calculate percentage of each class cover bin to the total class cover bins (prct)
-13. Set time interval of a standard Landsat scene n_times to be (25/37)*number of grids used	
-14. Set number of reference for euqal number training
+12. Set time interval of a standard Landsat scene n_times to be (25/37)*number of grids used
+13. If for any pixel number in any class bin is less than ceil(20000*n_times)
+       1. Find the 8 neighboring ARDs based on current ARD row and column numbers
+       2.  For border ARD, the neighboring ARDs could be less than 8
+       3.  Loop through a gradual increased radius, find at least ceil(20000*n_times) number of pixels for                  
+             each class, append the input data (output from CCD, NLCD and Fmask static ancillary data) into
+             X array, and put corresponding land cover trend reference data into Y array  
+14. Calculate percentage of each class cover bin to the total class cover bins (prct)	
+15. Set number of reference for euqal number training
     1. eq_num = ceil(20000*n_times); % total %
     2. n_min = ceil(600*n_times); % minimum %
     3. n_max = ceil(8000*n_times); % maximum % 
-15. Intialized selected X & Y training data by looping through number of classes
+16. Initialized selected X & Y training data by looping through number of classes
     1. Find ids for each land cover class
     2. Generate random permutation of the integer from 1 to length(ids)
     3. Adjust num_prop based (adj_num) on prct (adj_num = ceil(eq_num*prct(i_class));)
     4. Adjust num_prop  based (adj_num) on n_min & n_max
     5. if length(ids) > adj_num
          Use adj_num to select reference pixels for training
-       else
+        Else
          Use all ids for this land cover class
-16. Log for CCDC training parameters and versions and report only for the first task (optional)
-17. Random Forest model training uses X & Y arrays as inputs with default 500 regression trees
-18. Save RF model output structure into a file or into database in the future
+17. Log for CCDC training parameters and versions and report only for the first task (optional)
+18. Random Forest model training uses X & Y arrays as inputs with default 500 regression trees
+19. Save RF model output structure into a file or into database in the future 
 
-      
-      
-   
-
-
-
-      
       
 
    
