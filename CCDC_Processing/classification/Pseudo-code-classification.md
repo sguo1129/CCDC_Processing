@@ -67,6 +67,27 @@
 18. Random Forest model training uses X & Y arrays as inputs with default 500 regression trees
 19. Save RF model output structure into a file or into database in the future 
 
+Classification – Prediction Part
+
+1.	Loop through total number of time serial models and initialize non-empty results model IDs to be 1
+2.	If there is more than one curve exist for each line
+    1.  Assemble all classification inputs including all ancillary data
+    2.  Initialize map and votes arrays to be zero
+    3.  Load in Random Forest model structure
+    4.  Loop through number of years 
+        1.	Find the valid curve fitting in the right year
+        2.	Loop through number of all curves
+            1.  If curve is a valid one
+                Assemble all inputs Xcalss array which includes outputs from CCD and NLCD & 
+                Fmask statistics ancillary data
+            2.  Do classification for the whole line by calling Random Forest predication function
+        3.	If non-empty result model IDs larger than 1
+            1.  Loop through all non-empty result model IDs
+            2.  Get the largest and second largest number of votes
+            3.  Provide unsupervised ensemble margin as QA
+                rec_cg(IDs_add(i)).classQA = 100*(max_v1-max_v2)/ntrees;
+3. Add in class and classQA to the CCD output rec_cg structure
+4. Output class and classQA for each model curve either to an output file or to the database in the future 
       
 
    
