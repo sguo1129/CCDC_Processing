@@ -41,12 +41,24 @@ Classification - Training Part
 9. Output RF training input X and Y arrays into output files is an option
 10. Remove disturbed classes (values of 3 and 5) and zero value pixels in land cover trend reference data
 11. Calculate histogram bin or number of pixels for each land cover class
-12. Set time interval of a standard Landsat scene n_times to be (25/37)*number of grids used	
-13. Set number of reference for euqal number training
+12. Calculate percentage of each class cover bin to the total class cover bins (prct)
+13. Set time interval of a standard Landsat scene n_times to be (25/37)*number of grids used	
+14. Set number of reference for euqal number training
     1. eq_num = ceil(20000*n_times); % total %
     2. n_min = ceil(600*n_times); % minimum %
     3. n_max = ceil(8000*n_times); % maximum % 
-14. Intialized selected X & Y training data by looping through number of classes
+15. Intialized selected X & Y training data by looping through number of classes
+    1. Find ids for each land cover class
+    2. Generate random permutation of the integer from 1 to length(ids)
+    3. Adjust num_prop based (adj_num) on prct (adj_num = ceil(eq_num*prct(i_class));)
+    4. Adjust num_prop  based (adj_num) on n_min & n_max
+    5. if length(ids) > adj_num
+         Use adj_num to select reference pixels for training
+    Else
+         Use all ids for this land cover class
+16. Log for CCDC training parameters and versions and report only for the first task (optional)
+17. Random Forest model training uses X & Y arrays as inputs with default 500 regression trees
+18. Save RF model output structure into a file or into database in the future
 
       
       
