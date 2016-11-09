@@ -54,7 +54,7 @@ Classification - Training Part
     4. Adjust num_prop  based (adj_num) on n_min & n_max
     5. if length(ids) > adj_num
          Use adj_num to select reference pixels for training
-    Else
+       else
          Use all ids for this land cover class
 16. Log for CCDC training parameters and versions and report only for the first task (optional)
 17. Random Forest model training uses X & Y arrays as inputs with default 500 regression trees
